@@ -1,0 +1,146 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// A remodel engagement. One room in v1; the relation is already one-to-many.
+model Project {
+  id                    String       @id @default(cuid())
+  slug                  String       @unique
+  shareToken            String       @unique
+  locale                String       @default("zh")
+  title                 String
+  summary               String
+  property              Json
+  household             Json
+  requirements          Json
+  principles            Json
+  openItems             Json
+  generationConstraints Json
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+  rooms                 Room[]
+  schemes               Scheme[]
+  decorSet              DecorSet?
+  selection             Selection?
+  generations           Generation[]
+}
+
+model Room {
+  id            String  @id @default(cuid())
+  projectId     String
+  project       Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  kind          String
+  name          String
+  beforeSrc     String
+  beforeAlt     String
+  beforeCaption String
+  plan          Json
+  dimensions    Json
+  sortOrder     Int     @default(0)
+}
+
+/// A structural layout. Decor is a project-level palette applied on top,
+/// so finish choices survive when the client changes scheme.
+model Scheme {
+  id           String        @id @default(cuid())
+  projectId    String
+  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  key          String
+  name         String
+  nameEn       String?
+  sortOrder    Int
+  summary      String?
+  summaryLines Json?
+  imageAlt     String
+  decorMode    String
+  decorCaveat  String?
+  decorGrid    Json?
+  plan         Json?
+  hotspots     Json
+  compareRows  Json
+  optionGroups OptionGroup[]
+  renders      Render[]
+
+  @@unique([projectId, key])
+}
+
+model OptionGroup {
+  id                String   @id @default(cuid())
+  schemeId          String
+  scheme            Scheme   @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+  key               String
+  label             String
+  labelEn           String?
+  phase             String
+  sortOrder         Int
+  unavailableReason String?
+  options           Option[]
+
+  @@unique([schemeId, key])
+}
+
+model Option {
+  id           String      @id @default(cuid())
+  groupId      String
+  group        OptionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  key          String
+  label        String
+  labelEn      String?
+  detail       String?
+  isDefault    Boolean     @default(false)
+  costBand     String?
+  timelineBand String?
+  significant  Boolean     @default(false)
+  sortOrder    Int
+
+  @@unique([groupId, key])
+}
+
+/// One still (or one frame of a sprite) shown when `when` matches the
+/// current structure options, decor preset, or color-grid index.
+model Render {
+  id        String @id @default(cuid())
+  schemeId  String
+  scheme    Scheme @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+  role      String
+  src       String
+  frames    Int    @default(1)
+  frame     Int    @default(0)
+  when      Json
+  note      String?
+  sortOrder Int    @default(0)
+}
+
+model DecorSet {
+  id          String  @id @default(cuid())
+  projectId   String  @unique
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  presets     Json
+  axes        Json
+  compareRows Json
+  limitedNote String?
+}
+
+model Selection {
+  id        String   @id @default(cuid())
+  projectId String   @unique
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  state     Json
+  updatedAt DateTime @updatedAt
+}
+
+model Generation {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  provider  String
+  status    String
+  prompt    String
+  result    Json?
+  createdAt DateTime @default(now())
+}
