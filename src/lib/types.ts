@@ -190,6 +190,7 @@ export type GenerationDTO = {
   prompt: string;
   message: string | null;
   imageSrc: string | null;
+  schemeKey: string | null;
   createdAt: string;
 };
 
