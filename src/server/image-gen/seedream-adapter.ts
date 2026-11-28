@@ -195,7 +195,7 @@ async function readSourcePhoto(src: string): Promise<{ data: string; mime: strin
 }
 
 function outputFileName(outputBase: string | undefined, ext: string, folder: string): string {
-  const dir = /^fan(?:\/[a-z0-9-]+)?$/.test(folder) ? folder : "fan/seedream";
+  const dir = /^fan(?:\/[a-z0-9-]+){0,2}$/.test(folder) ? folder : "fan/seedream";
   if (outputBase && /^[a-z0-9-]+$/.test(outputBase)) return `${dir}/${outputBase}.${ext}`;
   return `gen-${Date.now()}.${ext}`;
 }

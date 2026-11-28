@@ -193,6 +193,11 @@ export type GenerationDTO = {
   message: string | null;
   imageSrc: string | null;
   createdAt: string;
+  stage?: string | null;
+  schemeKey?: string | null;
+  presetKey?: string | null;
+  attempt?: number | null;
+  accepted?: boolean | null;
 };
 
 export type ProjectDTO = {

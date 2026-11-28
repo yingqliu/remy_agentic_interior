@@ -11,7 +11,6 @@
     "check": "tsx scripts/check-visuals.ts && tsx scripts/check-prompt.ts && tsx scripts/check-image-gen.ts",
     "gen:fan": "tsx scripts/gen-fan.ts",
     "gen:fan:seedream": "tsx scripts/gen-fan.ts --provider seedream",
-    "gen:fan:gemini": "tsx scripts/gen-fan.ts --provider gemini",
     "setup": "prisma migrate deploy && prisma generate && tsx prisma/seed.ts",
     "db:seed": "tsx prisma/seed.ts",
     "postinstall": "prisma generate"

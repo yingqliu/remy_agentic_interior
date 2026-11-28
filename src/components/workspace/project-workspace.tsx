@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { structureAttemptCount, STRUCTURE_ATTEMPT_CAP } from "@/lib/generation-budget";
 import type { GenerationDTO, Locale, ProjectDTO, SelectionState } from "@/lib/types";
 import { activeScheme, presetByColors } from "@/lib/visuals";
 import type { Still } from "@/lib/visuals";
@@ -30,6 +31,8 @@ export function ProjectWorkspace({
   const [copied, setCopied] = useState(false);
   const [generations, setGenerations] = useState<GenerationDTO[]>(project.generations);
   const [generating, setGenerating] = useState(false);
+  const [paywall, setPaywall] = useState(false);
+  const [paywallNote, setPaywallNote] = useState(false);
   const latest = useRef(initialSelection);
   const dirty = useRef(false);
   const running = useRef(false);
@@ -121,15 +124,22 @@ export function ProjectWorkspace({
         setLightbox={setLightbox}
         generations={generations}
         generating={generating}
-        onGenerate={async () => {
+        paywall={paywall}
+        paywallNote={paywallNote}
+        onPaywall={() => setPaywall(true)}
+        onUpgrade={() => setPaywallNote(true)}
+        onGenerate={async (action, scheme) => {
           setGenerating(true);
           try {
-            const schemeKey = selection.structureKey;
-            const query = schemeKey ? `?scheme=${encodeURIComponent(schemeKey)}` : "";
-            const response = await fetch(`/api/projects/${project.slug}/generate${query}`, { method: "POST" });
-            if (!response.ok) return;
-            const body = (await response.json()) as { generation: GenerationDTO };
-            setGenerations((prev) => [body.generation, ...prev]);
+            const response = await fetch(`/api/projects/${project.slug}/generate`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(action === "regenerate" ? { action, scheme } : { action: "run" }),
+            });
+            const body = (await response.json().catch(() => null)) as { generations?: GenerationDTO[]; paywall?: boolean } | null;
+            if (!response.ok || !body) return;
+            if (body.paywall) setPaywall(true);
+            if (body.generations?.length) setGenerations((prev) => [...body.generations!, ...prev]);
           } finally {
             setGenerating(false);
           }
@@ -311,7 +321,11 @@ function WorkspaceBody(props: {
   setLightbox: (still: Still | null) => void;
   generations: GenerationDTO[];
   generating: boolean;
-  onGenerate: () => void;
+  paywall: boolean;
+  paywallNote: boolean;
+  onPaywall: () => void;
+  onUpgrade: () => void;
+  onGenerate: (action: "run" | "regenerate", scheme?: string) => void;
   onMode: (mode: "upload" | "manual") => void;
   onDimension: (id: string, text: string) => void;
   onFillExample: () => void;
@@ -418,9 +432,34 @@ function WorkspaceBody(props: {
                 <h2 className="font-medium">{t("generations")}</h2>
                 <p className="mt-1 max-w-2xl text-xs leading-relaxed text-muted">{t("generateHelp")}</p>
               </div>
-              <Button type="button" variant="primary" disabled={props.generating} onClick={props.onGenerate}>
+              <Button type="button" variant="primary" disabled={props.generating} onClick={() => props.onGenerate("run")}>
                 {props.generating ? t("generateRunning") : t("generate")}
               </Button>
+            </div>
+            <ul className="mt-4 flex flex-wrap gap-2">
+              {props.project.schemes.map((scheme) => {
+                const used = structureAttemptCount(props.generations, scheme.key);
+                const capped = used >= STRUCTURE_ATTEMPT_CAP;
+                return (
+                  <Button
+                    key={scheme.key}
+                    type="button"
+                    disabled={props.generating}
+                    onClick={() => (capped ? props.onPaywall() : props.onGenerate("regenerate", scheme.key))}
+                  >
+                    {t("regenerateStructure")} · {scheme.name}
+                    {capped ? "" : ` (${used}/${STRUCTURE_ATTEMPT_CAP})`}
+                  </Button>
+                );
+              })}
+            </ul>
+            <div className="mt-4 rounded-md border border-line p-3">
+              <p className="text-sm font-medium">{props.paywall ? t("paywallTitle") : t("unlockCustomization")}</p>
+              <p className="mt-1 text-xs leading-relaxed text-muted">{t("paywallBody")}</p>
+              <Button type="button" variant="primary" className="mt-3" onClick={props.onUpgrade}>
+                {t("paywallCta")}
+              </Button>
+              {props.paywallNote ? <p className="mt-2 text-xs text-muted">{t("paywallNote")}</p> : null}
             </div>
             <ul className="mt-4 space-y-3">
               {props.generations.map((item) => (

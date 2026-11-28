@@ -12,7 +12,9 @@ import {
 import { DEFAULT_HTTP_IMAGE_MODEL, DEFAULT_HTTP_IMAGE_QUALITY, httpProviderFromEnv } from "../src/server/image-gen/http-adapter";
 import { getImageProvider } from "../src/server/image-gen";
 import { buildFanProject } from "../prisma/fan-data";
-import { runFanSchemes } from "../src/server/image-gen/fan-run";
+import { presetFinishLine } from "../src/server/image-gen/preset-wording";
+import { assessImageBytes } from "../src/server/image-gen/image-check";
+import { MAX_SEEDREAM_CALLS_PER_FULL_RUN, runSeedreamFanFlow } from "../src/server/image-gen/fan-seedream-flow";
 import {
   DEFAULT_SEEDREAM_MODEL,
   SEEDREAM_EDIT_INSTRUCTION,
@@ -71,6 +73,19 @@ const request: GenerateRequest = {
 };
 
 type Captured = { url: string; init: RequestInit | undefined };
+
+function pngImage(width: number, height: number): Buffer {
+  const bytes = Buffer.alloc(24);
+  bytes[0] = 0x89;
+  bytes.write("PNG", 1, "ascii");
+  bytes[4] = 0x0d;
+  bytes[5] = 0x0a;
+  bytes[6] = 0x1a;
+  bytes[7] = 0x0a;
+  bytes.writeUInt32BE(width, 16);
+  bytes.writeUInt32BE(height, 20);
+  return bytes;
+}
 
 function installFetch(handler: (captured: Captured) => Promise<Response> | Response) {
   const calls: Captured[] = [];
@@ -231,45 +246,87 @@ async function main() {
     await unlink(path.join(process.cwd(), "public", seedream.imageSrc!));
 
     const project = buildFanProject();
-    const urls: string[] = [];
-    installFetch((captured) => {
-      urls.push(captured.url);
-      return new Response("seedream down", { status: 500 });
-    });
-    const logs: string[] = [];
-    const errors: string[] = [];
-    const failed = await runFanSchemes({
-      providers: ["seedream"],
-      arkKey: "test-ark-key",
-      geminiKey: "gemini-key-must-not-be-used",
-      project,
-      sourcePhotoFor: () => "/seed/fan/fan-before.jpg",
-      log: (line) => logs.push(line),
-      error: (line) => errors.push(line),
-    });
-    expect(failed === 1, "Seedream failures exit non-zero");
-    expect(urls.length === project.schemes.length, "every scheme is attempted");
-    expect(urls.every((url) => url.startsWith("https://ark.cn-beijing.volces.com/")), "failures stay on Seedream");
-    expect(!urls.some((url) => url.includes("generativelanguage.googleapis.com")), "a Seedream failure does not call Gemini");
-    expect(errors.length === project.schemes.length, "each failed scheme is reported");
-    expect(logs.every((line) => line.startsWith("Seedream ")), "logs name Seedream");
+    const goodPng = pngImage(2496, 1664);
+    const tinyPng = pngImage(100, 80);
+    expect(assessImageBytes(goodPng).ok, "3:2 2K image passes");
+    expect(assessImageBytes(tinyPng).reason?.includes("too small"), "tiny image is poor");
+    expect(assessImageBytes(pngImage(1000, 1000)).reason?.includes("aspect"), "square image is the wrong aspect");
+    expect(MAX_SEEDREAM_CALLS_PER_FULL_RUN === 20, "full run cap is 4x2 structure plus 4x3 finishes");
 
-    const skipped: string[] = [];
-    const empty = await runFanSchemes({
-      providers: ["seedream"],
-      arkKey: "",
-      geminiKey: "gemini-key-must-not-be-used",
+    for (const preset of project.decor.presets) {
+      const line = presetFinishLine(preset);
+      expect(line.includes(preset.name) && line.includes("Do not add or move windows"), `${preset.key} wording locks windows`);
+    }
+    expect(presetFinishLine(project.decor.presets[0]).includes("brushed nickel shower fixtures"), "mist fixture wording");
+    expect(presetFinishLine(project.decor.presets[1]).includes("a dark wood vanity"), "wood vanity wording");
+    expect(presetFinishLine(project.decor.presets[2]).includes("ink-gray stone wall tile"), "ink wall wording");
+
+    const prompts: string[] = [];
+    const folders: string[] = [];
+    let structureReads = 0;
+    const poorThenGood = await runSeedreamFanFlow({
+      arkKey: "test-ark-key",
       project,
-      sourcePhotoFor: () => "/seed/fan/fan-before.jpg",
-      error: (line) => skipped.push(line),
-      generateSeedream: () => {
+      sourcePhoto: "/seed/fan/fan-before.jpg",
+      readBytes: async (src) => {
+        if (!src.endsWith("/structure.jpg")) return goodPng;
+        structureReads += 1;
+        return structureReads % 2 === 1 ? tinyPng : goodPng;
+      },
+      generate: async (_key, request, options) => {
+        prompts.push(request.prompt);
+        folders.push(`${options?.folder ?? ""}/${options?.outputBase ?? ""}`);
+        return {
+          provider: "seedream",
+          status: "ready",
+          imageSrc: `/uploads/${options?.folder}/${options?.outputBase}.jpg`,
+          message: "ok",
+          prompt: request.prompt,
+        };
+      },
+    });
+    expect(poorThenGood.exitCode === 0, "retry then finishes succeed");
+    const structureCalls = folders.filter((item) => item.endsWith("/structure"));
+    const finishCalls = folders.filter((item) => /\/(mist|wood|ink)$/.test(item));
+    expect(structureCalls.length === 8, "each scheme gets two structure attempts when the first is poor");
+    expect(finishCalls.length === 12, "three finish presets for each scheme");
+    expect(prompts.filter((prompt) => prompt.includes("Finish variant")).length === 12, "finish prompts name the preset");
+    expect(prompts.every((prompt) => prompt.includes("Never move, add, or resize windows")), "structural window lock stays in every prompt");
+    expect(folders.every((item) => item.startsWith("fan/seedream/")), "files stay under the Seedream scheme folder");
+
+    let judgeCalls = 0;
+    const judged = await runSeedreamFanFlow({
+      arkKey: "test-ark-key",
+      project,
+      sourcePhoto: "/seed/fan/fan-before.jpg",
+      schemes: [project.schemes[0]],
+      readBytes: async () => goodPng,
+      judge: () => {
+        judgeCalls += 1;
+        return judgeCalls === 1 ? { ok: false, reason: "quality judge rejected the image" } : { ok: true };
+      },
+      generate: async (_key, request, options) => ({
+        provider: "seedream",
+        status: "ready",
+        imageSrc: `/uploads/${options?.folder}/${options?.outputBase}.jpg`,
+        message: "ok",
+        prompt: request.prompt,
+      }),
+    });
+    expect(judgeCalls === 5, "judge runs on the retried structure and the three finishes");
+    expect(judged.exitCode === 0, "judge hook can accept the second structure attempt");
+
+    const blocked: string[] = [];
+    const emptyFlow = await runSeedreamFanFlow({
+      arkKey: "",
+      project,
+      sourcePhoto: "/seed/fan/fan-before.jpg",
+      error: (line) => blocked.push(line),
+      generate: async () => {
         throw new Error("Seedream should not be called");
       },
-      generateGemini: () => {
-        throw new Error("Gemini should not be called");
-      },
     });
-    expect(empty === 1 && skipped[0]?.includes("ARK_API_KEY is empty"), "empty Seedream key exits before a call");
+    expect(emptyFlow.exitCode === 1 && blocked[0]?.includes("ARK_API_KEY is empty"), "empty Seedream key exits before a call");
 
     const missingKey = spawnSync(process.execPath, [path.join("node_modules", "tsx", "dist", "cli.mjs"), "scripts/gen-fan.ts"], {
       cwd: process.cwd(),
@@ -280,6 +337,13 @@ async function main() {
     expect(missingKey.stderr.includes("ARK_API_KEY is empty"), "gen:fan names the Seedream key");
     expect(missingKey.stderr.includes("Seedream was not called"), "gen:fan does not call Seedream without a key");
     expect(!missingKey.stdout.includes("Gemini"), "gen:fan does not start Gemini");
+    const geminiFlag = spawnSync(process.execPath, [path.join("node_modules", "tsx", "dist", "cli.mjs"), "scripts/gen-fan.ts", "--provider", "gemini"], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      env: { ...process.env, ARK_API_KEY: "should-not-be-used", GEMINI_API_KEY: "should-not-be-used" },
+    });
+    expect(geminiFlag.status === 1, "gemini flag exits");
+    expect(geminiFlag.stderr.includes("Gemini was not called"), "gemini flag does not call Gemini");
 
     console.log("image-gen checks ok");
   } finally {

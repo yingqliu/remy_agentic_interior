@@ -1,8 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { buildFanProject } from "../prisma/fan-data";
-import { DEFAULT_GEMINI_REFERENCE_PHOTO, referencePhotoPublicSrc } from "../src/server/image-gen/gemini-adapter";
-import { providersFromArgv, runFanSchemes, type FanProviderName } from "../src/server/image-gen/fan-run";
+import { referencePhotoPublicSrc } from "../src/server/image-gen/gemini-adapter";
+import { runSeedreamFanFlow } from "../src/server/image-gen/fan-seedream-flow";
 import { DEFAULT_SEEDREAM_REFERENCE_PHOTO } from "../src/server/image-gen/seedream-adapter";
 
 function loadEnvFile(file: string): boolean {
@@ -23,48 +23,29 @@ function loadEnvFile(file: string): boolean {
   return true;
 }
 
-function photoFor(provider: FanProviderName): string {
-  if (provider === "seedream") {
-    return referencePhotoPublicSrc(process.env.SEEDREAM_REFERENCE_PHOTO || DEFAULT_SEEDREAM_REFERENCE_PHOTO);
-  }
-  return referencePhotoPublicSrc(process.env.GEMINI_REFERENCE_PHOTO || DEFAULT_GEMINI_REFERENCE_PHOTO);
-}
-
-function assertPhoto(provider: FanProviderName, projectBefore: string): boolean {
-  const src = photoFor(provider);
-  const abs = path.join(process.cwd(), "public", src.replace(/^\/+/, ""));
-  const fan = path.join(process.cwd(), "public", projectBefore.replace(/^\/+/, ""));
-  if (!existsSync(abs)) {
-    console.error(`Reference photo not found at ${abs}. ${provider} was not called.`);
-    return false;
-  }
-  if (path.resolve(abs) !== path.resolve(fan)) {
-    console.error(`The ${provider} reference photo (${src}) is not the 樊家 before photo (${projectBefore}). ${provider} was not called.`);
-    return false;
-  }
-  return true;
-}
-
 async function main() {
-  const hasEnv = loadEnvFile(".env");
-  const providers = providersFromArgv(process.argv.slice(2));
-  if (!providers) {
-    console.error("Unknown --provider. Use seedream, gemini, or both.");
+  const providerFlag = process.argv.indexOf("--provider");
+  const provider = providerFlag >= 0 ? process.argv[providerFlag + 1] : "seedream";
+  if (provider !== "seedream") {
+    console.error("This generation flow uses Seedream only. Gemini was not called.");
     process.exit(1);
   }
-  if (!hasEnv) console.error("No .env file. Copy .env.ready to .env and set the provider key.");
+  const hasEnv = loadEnvFile(".env");
+  if (!hasEnv) console.error("No .env file. Copy .env.ready to .env and set ARK_API_KEY.");
+  const sourcePhoto = referencePhotoPublicSrc(process.env.SEEDREAM_REFERENCE_PHOTO || DEFAULT_SEEDREAM_REFERENCE_PHOTO);
   const project = buildFanProject();
-  for (const provider of providers) {
-    if (!assertPhoto(provider, project.room.beforeSrc)) process.exit(1);
+  const abs = path.join(process.cwd(), "public", sourcePhoto.replace(/^\/+/, ""));
+  const fan = path.join(process.cwd(), "public", project.room.beforeSrc.replace(/^\/+/, ""));
+  if (!existsSync(abs) || path.resolve(abs) !== path.resolve(fan)) {
+    console.error(`Reference photo ${sourcePhoto} is not the 樊家 before photo. Seedream was not called.`);
+    process.exit(1);
   }
-  const code = await runFanSchemes({
-    providers,
+  const { exitCode } = await runSeedreamFanFlow({
     arkKey: process.env.ARK_API_KEY ?? "",
-    geminiKey: process.env.GEMINI_API_KEY ?? "",
     project,
-    sourcePhotoFor: photoFor,
+    sourcePhoto,
   });
-  process.exit(code);
+  process.exit(exitCode);
 }
 
 main().catch((error: unknown) => {

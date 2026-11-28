@@ -75,19 +75,11 @@ Provider choice: `IMAGE_PROVIDER=seedream` uses Seedream when `ARK_API_KEY` is s
 cp .env.ready .env
 ```
 
-`ARK_API_KEY` and `GEMINI_API_KEY` are the only empty values. `npm run gen:fan` runs Seedream only, for 方案一, 方案一变体, 短墙嵌缸, and 缸沿平台, and writes `public/uploads/fan/seedream/<scheme>.jpg`. An empty `ARK_API_KEY` exits before any request. A failed scheme is reported and the remaining schemes still run on Seedream. Gemini is not called unless you ask for it:
-
-```
-npm run gen:fan:gemini
-npm run gen:fan -- --provider gemini
-npm run gen:fan -- --provider both
-```
-
-Gemini images go to `public/uploads/fan/gemini/<scheme>.jpg`. `--provider both` is two separate passes, not a retry.
+`ARK_API_KEY` and `GEMINI_API_KEY` are the only empty values. `npm run gen:fan` runs Seedream only. For each of 方案一, 方案一变体, 短墙嵌缸, and 缸沿平台 it draws a structure image, retries once when that image is poor, then draws mist, wood, and ink from the approved structure. Files are `public/uploads/fan/seedream/<scheme>/structure.jpg` and `<scheme>/mist.jpg`, `wood.jpg`, and `ink.jpg`. A full run makes at most 20 Seedream calls. An empty `ARK_API_KEY` exits before any request. Passing `--provider gemini` exits without calling Gemini. The studio shows an upgrade placeholder for further customization.
 
 Every prompt, including the stub's, includes hard constraints: do not invent openings that are not in the source photo or the written requirements; do not move, add, or resize windows; do not add structure the selected scheme does not call for; do not move fixtures to improve the picture. Structural locks (sliding doors, sliding windows, hallway door openings, kitchen door openings, ceiling height, and camera viewpoint) apply only when that element is already in the source photo, and the prompt must not tell the model to add one that is absent. A television is not preset: it may be added only on a dry wall with an unobstructed sightline, never on or instead of a window. Anything the requirements and the selected scheme do not explicitly ask to change stays as built. Project-level constraints are stored on the project. Scheme-level constraints are stored on the scheme and included when the request names that scheme (`POST /api/projects/{slug}/generate?scheme={key}`).
 
-`记录一次生成请求` on the studio page exercises this path. If a structure scheme is selected, the request uses that scheme.
+`生成结构与三套饰面` on the studio page runs the same Seedream flow. Each structure can be regenerated once more, and the total stays at two attempts.
 
 ## Decisions worth passing on
 
