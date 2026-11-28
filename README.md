@@ -68,15 +68,19 @@ Provider choice, in order: Gemini when `IMAGE_PROVIDER=gemini` and `GEMINI_API_K
 - **Gemini** (`gemini-adapter.ts`). Nano Banana 2.1, model id `gemini-nano-banana-2.1` ([pricing](https://ai.google.dev/gemini-api/docs/pricing), [image generation](https://ai.google.dev/gemini-api/docs/image-generation)). `POST https://generativelanguage.googleapis.com/v1beta/interactions` with the source photo read from `public/` (for the seed, `public/seed/fan/fan-before.jpg`) as inline base64, plus a prompt that says to edit that exact room (same camera, same window position, same walls). Output is `image_size` `2K` at aspect ratio `3:2` (2528×1696). The header is `x-goog-api-key`. A returned image is saved under `public/uploads` and on the generation row. It is not written onto a scheme.
 - **HTTP adapter** (`http-adapter.ts`). OpenAI-compatible `POST /images/generations`. Default model is `gpt-image-2.6-flare` (`IMAGE_API_MODEL` overrides it). `IMAGE_API_QUALITY` is sent as `quality` and defaults to `medium`. This adapter sends the prompt only and does not upload the source photo. A returned image is saved under `public/uploads` and on the generation row, not onto a scheme.
 
-Gemini setup:
+Gemini setup for the 樊家 bathroom: `.env` is gitignored, so copy the filled file and set the key.
 
 ```
-IMAGE_PROVIDER="gemini"
-GEMINI_API_KEY="paste-your-key-here"
-GEMINI_IMAGE_MODEL="gemini-nano-banana-2.1"
+cp .env.ready .env
 ```
 
-`GEMINI_IMAGE_MODEL` may be omitted; the default is `gemini-nano-banana-2.1`. If `IMAGE_PROVIDER` is not `gemini` or the key is blank, Gemini is not called.
+`GEMINI_API_KEY` is the only empty value in that file. Then:
+
+```
+npm run gen:fan
+```
+
+That command generates 方案一, 方案一变体, 短墙嵌缸, and 缸沿平台. It sends `public/seed/fan/fan-before.jpg` as the reference image and writes `public/uploads/fan/open.jpg`, `wetroom.jpg`, `alcove.jpg`, and `panel.jpg`. If `GEMINI_API_KEY` is empty it exits with an error and does not call Gemini. The studio button still falls through to the HTTP adapter or the stub when the key is blank.
 
 Every prompt, including the stub's, includes hard constraints: do not invent openings that are not in the source photo or the written requirements; do not move, add, or resize windows; do not add structure the selected scheme does not call for; do not move fixtures to improve the picture. Structural locks (sliding doors, sliding windows, hallway door openings, kitchen door openings, ceiling height, and camera viewpoint) apply only when that element is already in the source photo, and the prompt must not tell the model to add one that is absent. A television is not preset: it may be added only on a dry wall with an unobstructed sightline, never on or instead of a window. Anything the requirements and the selected scheme do not explicitly ask to change stays as built. Project-level constraints are stored on the project. Scheme-level constraints are stored on the scheme and included when the request names that scheme (`POST /api/projects/{slug}/generate?scheme={key}`).
 

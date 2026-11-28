@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { readFile, unlink } from "node:fs/promises";
 import path from "node:path";
 import {
@@ -16,7 +17,18 @@ function expect(condition: unknown, message: string) {
   if (!condition) throw new Error(message);
 }
 
-const ENV_KEYS = ["IMAGE_PROVIDER", "GEMINI_API_KEY", "GEMINI_IMAGE_MODEL", "IMAGE_API_BASE", "IMAGE_API_KEY", "IMAGE_API_MODEL", "IMAGE_API_QUALITY"] as const;
+const ENV_KEYS = [
+  "IMAGE_PROVIDER",
+  "GEMINI_API_KEY",
+  "GEMINI_IMAGE_MODEL",
+  "GEMINI_ASPECT_RATIO",
+  "GEMINI_IMAGE_SIZE",
+  "GEMINI_REFERENCE_PHOTO",
+  "IMAGE_API_BASE",
+  "IMAGE_API_KEY",
+  "IMAGE_API_MODEL",
+  "IMAGE_API_QUALITY",
+] as const;
 const savedEnv = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
 const originalFetch = globalThis.fetch;
 
@@ -123,10 +135,16 @@ async function main() {
     process.env.IMAGE_PROVIDER = "gemini";
     process.env.GEMINI_API_KEY = fakeKey;
     process.env.GEMINI_IMAGE_MODEL = "gemini-nano-banana-2.1-custom";
+    process.env.GEMINI_IMAGE_SIZE = "1K";
+    process.env.GEMINI_ASPECT_RATIO = "16:9";
     const overrideCalls = installFetch(() => new Response("nope", { status: 400 }));
     const override = await geminiProviderFromEnv()!.generate(request);
-    const overrideBody = JSON.parse(String(overrideCalls[0].init?.body)) as { model: string };
+    const overrideBody = JSON.parse(String(overrideCalls[0].init?.body)) as {
+      model: string;
+      response_format: { image_size: string; aspect_ratio: string };
+    };
     expect(overrideBody.model === "gemini-nano-banana-2.1-custom", "GEMINI_IMAGE_MODEL overrides the default");
+    expect(overrideBody.response_format.image_size === "1K" && overrideBody.response_format.aspect_ratio === "16:9", "size and aspect come from env");
     expect(override.status === "error" && override.message.includes("400") && override.message.includes("gemini-nano-banana-2.1-custom"), "API errors name the status and model");
     expect(override.imageSrc === null, "errors do not invent an image");
 
@@ -155,6 +173,15 @@ async function main() {
     await httpProviderFromEnv()!.generate(request);
     const qualityBody = JSON.parse(String(qualityCalls[0].init?.body)) as { quality: string };
     expect(qualityBody.quality === "high", "IMAGE_API_QUALITY is sent as quality");
+
+    const missingKey = spawnSync(process.execPath, [path.join("node_modules", "tsx", "dist", "cli.mjs"), "scripts/gen-fan.ts"], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      env: { ...process.env, GEMINI_API_KEY: "" },
+    });
+    expect(missingKey.status === 1, "gen:fan exits when the key is empty");
+    expect(missingKey.stderr.includes("GEMINI_API_KEY is empty"), "gen:fan names the missing key");
+    expect(missingKey.stderr.includes("Gemini was not called"), "gen:fan does not call Gemini without a key");
 
     console.log("image-gen checks ok");
   } finally {

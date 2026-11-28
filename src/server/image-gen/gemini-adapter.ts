@@ -24,6 +24,7 @@ export const DEFAULT_GEMINI_IMAGE_MODEL = "gemini-nano-banana-2.1";
 export const GEMINI_INTERACTIONS_URL = "https://generativelanguage.googleapis.com/v1beta/interactions";
 export const GEMINI_IMAGE_SIZE = "2K";
 export const GEMINI_ASPECT_RATIO = "3:2";
+export const DEFAULT_GEMINI_REFERENCE_PHOTO = "public/seed/fan/fan-before.jpg";
 
 export const GEMINI_EDIT_INSTRUCTION =
   "Edit the attached source photograph of this exact room. Keep the same camera viewpoint, the same window position, and the same walls. Change only what the prompt explicitly asks to change.";
@@ -44,6 +45,20 @@ type InteractionResponse = {
   steps?: InteractionStep[];
 };
 
+export function geminiImageSettings(): { aspectRatio: string; imageSize: string } {
+  return {
+    aspectRatio: process.env.GEMINI_ASPECT_RATIO?.trim() || GEMINI_ASPECT_RATIO,
+    imageSize: process.env.GEMINI_IMAGE_SIZE?.trim() || GEMINI_IMAGE_SIZE,
+  };
+}
+
+/** `public/seed/fan/fan-before.jpg` becomes the public URL path `/seed/fan/fan-before.jpg`. */
+export function referencePhotoPublicSrc(raw = process.env.GEMINI_REFERENCE_PHOTO): string {
+  const value = (raw?.trim() || DEFAULT_GEMINI_REFERENCE_PHOTO).replace(/^\.\//, "");
+  const rel = value.startsWith("public/") ? value.slice("public/".length) : value.replace(/^\/+/, "");
+  return `/${rel}`;
+}
+
 export function geminiProviderFromEnv(): ImageProvider | null {
   if (process.env.IMAGE_PROVIDER?.trim().toLowerCase() !== "gemini") return null;
   const key = process.env.GEMINI_API_KEY?.trim();
@@ -55,10 +70,25 @@ export function geminiProviderFromEnv(): ImageProvider | null {
   };
 }
 
-export async function generateWithGemini(key: string, model: string, request: GenerateRequest): Promise<GenerateResult> {
+export async function generateWithGemini(
+  key: string,
+  model: string,
+  request: GenerateRequest,
+  options?: { outputBase?: string },
+): Promise<GenerateResult> {
   const photo = await readSourcePhoto(request.sourcePhoto);
   if ("error" in photo) {
     return { provider: "gemini", status: "error", imageSrc: null, message: photo.error, prompt: request.prompt };
+  }
+  const settings = geminiImageSettings();
+  if (options?.outputBase !== undefined && !/^[a-z0-9-]+$/.test(options.outputBase)) {
+    return {
+      provider: "gemini",
+      status: "error",
+      imageSrc: null,
+      message: `Output name “${options.outputBase}” is not a scheme key. Gemini was not called.`,
+      prompt: request.prompt,
+    };
   }
   const payload = {
     model,
@@ -68,8 +98,8 @@ export async function generateWithGemini(key: string, model: string, request: Ge
     ],
     response_format: {
       type: "image",
-      aspect_ratio: GEMINI_ASPECT_RATIO,
-      image_size: GEMINI_IMAGE_SIZE,
+      aspect_ratio: settings.aspectRatio,
+      image_size: settings.imageSize,
       mime_type: "image/jpeg",
       delivery: "inline",
     },
@@ -118,15 +148,15 @@ export async function generateWithGemini(key: string, model: string, request: Ge
       };
     }
     const ext = extensionForMime(image.mime);
-    const name = `gen-${Date.now()}.${ext}`;
+    const name = outputFileName(options?.outputBase, ext);
     const dir = path.join(process.cwd(), "public", "uploads");
-    await mkdir(dir, { recursive: true });
+    await mkdir(path.dirname(path.join(dir, name)), { recursive: true });
     await writeFile(path.join(dir, name), Buffer.from(image.data, "base64"));
     return {
       provider: "gemini",
       status: "ready",
       imageSrc: `/uploads/${name}`,
-      message: `Stored the image returned by Gemini (${model}, ${GEMINI_IMAGE_SIZE}, ${GEMINI_ASPECT_RATIO}).`,
+      message: `Stored the image returned by Gemini (${model}, ${settings.imageSize}, ${settings.aspectRatio}).`,
       prompt: request.prompt,
     };
   } catch (error) {
@@ -179,6 +209,11 @@ function locatePublicImage(src: string): { abs: string; mime: string } | { error
     return { error: `Source photo “${src}” must be JPEG, PNG, or WebP. Gemini was not called.` };
   }
   return { abs, mime };
+}
+
+function outputFileName(outputBase: string | undefined, ext: string): string {
+  if (outputBase && /^[a-z0-9-]+$/.test(outputBase)) return `fan/${outputBase}.${ext}`;
+  return `gen-${Date.now()}.${ext}`;
 }
 
 function isEnoent(error: unknown): boolean {
