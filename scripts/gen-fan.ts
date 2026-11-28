@@ -1,16 +1,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { buildFanProject } from "../prisma/fan-data";
-import { buildGenerationRequest } from "../src/server/image-gen/prompt";
-import {
-  DEFAULT_GEMINI_IMAGE_MODEL,
-  DEFAULT_GEMINI_REFERENCE_PHOTO,
-  generateWithGemini,
-  referencePhotoPublicSrc,
-} from "../src/server/image-gen/gemini-adapter";
-
-const MISSING_KEY =
-  "GEMINI_API_KEY is empty. Copy .env.ready to .env, set GEMINI_API_KEY, then run npm run gen:fan. Gemini was not called.";
+import { DEFAULT_GEMINI_REFERENCE_PHOTO, referencePhotoPublicSrc } from "../src/server/image-gen/gemini-adapter";
+import { providersFromArgv, runFanSchemes, type FanProviderName } from "../src/server/image-gen/fan-run";
+import { DEFAULT_SEEDREAM_REFERENCE_PHOTO } from "../src/server/image-gen/seedream-adapter";
 
 function loadEnvFile(file: string): boolean {
   const abs = path.resolve(process.cwd(), file);
@@ -30,43 +23,48 @@ function loadEnvFile(file: string): boolean {
   return true;
 }
 
+function photoFor(provider: FanProviderName): string {
+  if (provider === "seedream") {
+    return referencePhotoPublicSrc(process.env.SEEDREAM_REFERENCE_PHOTO || DEFAULT_SEEDREAM_REFERENCE_PHOTO);
+  }
+  return referencePhotoPublicSrc(process.env.GEMINI_REFERENCE_PHOTO || DEFAULT_GEMINI_REFERENCE_PHOTO);
+}
+
+function assertPhoto(provider: FanProviderName, projectBefore: string): boolean {
+  const src = photoFor(provider);
+  const abs = path.join(process.cwd(), "public", src.replace(/^\/+/, ""));
+  const fan = path.join(process.cwd(), "public", projectBefore.replace(/^\/+/, ""));
+  if (!existsSync(abs)) {
+    console.error(`Reference photo not found at ${abs}. ${provider} was not called.`);
+    return false;
+  }
+  if (path.resolve(abs) !== path.resolve(fan)) {
+    console.error(`The ${provider} reference photo (${src}) is not the 樊家 before photo (${projectBefore}). ${provider} was not called.`);
+    return false;
+  }
+  return true;
+}
+
 async function main() {
   const hasEnv = loadEnvFile(".env");
-  const key = process.env.GEMINI_API_KEY?.trim() ?? "";
-  if (!key) {
-    console.error(hasEnv ? MISSING_KEY : `No .env file. ${MISSING_KEY}`);
+  const providers = providersFromArgv(process.argv.slice(2));
+  if (!providers) {
+    console.error("Unknown --provider. Use seedream, gemini, or both.");
     process.exit(1);
   }
-
-  process.env.IMAGE_PROVIDER = "gemini";
-  const model = process.env.GEMINI_IMAGE_MODEL?.trim() || DEFAULT_GEMINI_IMAGE_MODEL;
-  const sourcePhoto = referencePhotoPublicSrc();
-  const photoAbs = path.join(process.cwd(), "public", sourcePhoto.replace(/^\/+/, ""));
-  if (!existsSync(photoAbs)) {
-    console.error(`Reference photo not found at ${process.env.GEMINI_REFERENCE_PHOTO?.trim() || DEFAULT_GEMINI_REFERENCE_PHOTO}. Gemini was not called.`);
-    process.exit(1);
-  }
-
+  if (!hasEnv) console.error("No .env file. Copy .env.ready to .env and set the provider key.");
   const project = buildFanProject();
-  const fanPhoto = path.join(process.cwd(), "public", project.room.beforeSrc.replace(/^\/+/, ""));
-  if (path.resolve(photoAbs) !== path.resolve(fanPhoto)) {
-    console.error(
-      `GEMINI_REFERENCE_PHOTO (${sourcePhoto}) is not the 樊家 before photo (${project.room.beforeSrc}). Gemini was not called.`,
-    );
-    process.exit(1);
+  for (const provider of providers) {
+    if (!assertPhoto(provider, project.room.beforeSrc)) process.exit(1);
   }
-
-  for (const scheme of project.schemes) {
-    const request = buildGenerationRequest(project, scheme);
-    request.sourcePhoto = sourcePhoto;
-    console.log(`Generating ${scheme.name} (${scheme.key}) from ${sourcePhoto}`);
-    const result = await generateWithGemini(key, model, request, { outputBase: scheme.key });
-    if (result.status !== "ready" || !result.imageSrc) {
-      console.error(`${scheme.name} (${scheme.key}) failed: ${result.message}`);
-      process.exit(1);
-    }
-    console.log(`${scheme.name} (${scheme.key}) -> public${result.imageSrc}`);
-  }
+  const code = await runFanSchemes({
+    providers,
+    arkKey: process.env.ARK_API_KEY ?? "",
+    geminiKey: process.env.GEMINI_API_KEY ?? "",
+    project,
+    sourcePhotoFor: photoFor,
+  });
+  process.exit(code);
 }
 
 main().catch((error: unknown) => {

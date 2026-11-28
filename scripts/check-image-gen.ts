@@ -11,6 +11,14 @@ import {
 } from "../src/server/image-gen/gemini-adapter";
 import { DEFAULT_HTTP_IMAGE_MODEL, DEFAULT_HTTP_IMAGE_QUALITY, httpProviderFromEnv } from "../src/server/image-gen/http-adapter";
 import { getImageProvider } from "../src/server/image-gen";
+import { buildFanProject } from "../prisma/fan-data";
+import { runFanSchemes } from "../src/server/image-gen/fan-run";
+import {
+  DEFAULT_SEEDREAM_MODEL,
+  SEEDREAM_EDIT_INSTRUCTION,
+  generateWithSeedream,
+  seedreamProviderFromEnv,
+} from "../src/server/image-gen/seedream-adapter";
 import type { GenerateRequest } from "../src/server/image-gen/types";
 
 function expect(condition: unknown, message: string) {
@@ -24,6 +32,14 @@ const ENV_KEYS = [
   "GEMINI_ASPECT_RATIO",
   "GEMINI_IMAGE_SIZE",
   "GEMINI_REFERENCE_PHOTO",
+  "ARK_API_KEY",
+  "SEEDREAM_API_BASE",
+  "SEEDREAM_MODEL",
+  "SEEDREAM_SIZE",
+  "SEEDREAM_RESPONSE_FORMAT",
+  "SEEDREAM_OUTPUT_FORMAT",
+  "SEEDREAM_WATERMARK",
+  "SEEDREAM_REFERENCE_PHOTO",
   "IMAGE_API_BASE",
   "IMAGE_API_KEY",
   "IMAGE_API_MODEL",
@@ -174,14 +190,96 @@ async function main() {
     const qualityBody = JSON.parse(String(qualityCalls[0].init?.body)) as { quality: string };
     expect(qualityBody.quality === "high", "IMAGE_API_QUALITY is sent as quality");
 
+    clearImageEnv();
+    process.env.IMAGE_PROVIDER = "seedream";
+    process.env.GEMINI_API_KEY = "gemini-key-must-not-be-selected";
+    expect(seedreamProviderFromEnv() === null, "seedream without a key stays inactive");
+    expect(getImageProvider().id === "stub", "a missing Seedream key does not fall back to Gemini");
+    process.env.ARK_API_KEY = "test-ark-key";
+    expect(getImageProvider().id === "seedream", "IMAGE_PROVIDER=seedream selects Seedream");
+
+    const seedreamCalls = installFetch(
+      () =>
+        new Response(JSON.stringify({ data: [{ b64_json: png.toString("base64") }] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+    const seedream = await generateWithSeedream("test-ark-key", request, { outputBase: "open", folder: "fan/seedream" });
+    expect(seedreamCalls.length === 1, "one Seedream request");
+    expect(seedreamCalls[0].url === "https://ark.cn-beijing.volces.com/api/v3/images/generations", "Ark endpoint");
+    expect(new Headers(seedreamCalls[0].init?.headers).get("authorization") === "Bearer test-ark-key", "Ark key from ARK_API_KEY");
+    const seedreamBody = JSON.parse(String(seedreamCalls[0].init?.body)) as {
+      model: string;
+      prompt: string;
+      image: string;
+      size: string;
+      response_format: string;
+      output_format: string;
+      watermark: boolean;
+    };
+    expect(seedreamBody.model === DEFAULT_SEEDREAM_MODEL, "Seedream model id");
+    expect(seedreamBody.size === "2K", "Seedream size 2K");
+    expect(seedreamBody.response_format === "b64_json", "Seedream returns b64_json");
+    expect(seedreamBody.output_format === "jpeg", "Seedream jpeg output");
+    expect(seedreamBody.watermark === false, "Seedream watermark off");
+    expect(seedreamBody.image === `data:image/jpeg;base64,${photoB64}`, "reference photo is a data URI");
+    expect(seedreamBody.prompt.includes(SEEDREAM_EDIT_INSTRUCTION), "Seedream edit instruction");
+    expect(seedreamBody.prompt.includes("3:2"), "Seedream prompt states 3:2");
+    expect(seedreamBody.prompt.includes(request.prompt), "scheme prompt is included");
+    expect(seedream.status === "ready" && seedream.imageSrc === "/uploads/fan/seedream/open.jpg", "Seedream image path");
+    await unlink(path.join(process.cwd(), "public", seedream.imageSrc!));
+
+    const project = buildFanProject();
+    const urls: string[] = [];
+    installFetch((captured) => {
+      urls.push(captured.url);
+      return new Response("seedream down", { status: 500 });
+    });
+    const logs: string[] = [];
+    const errors: string[] = [];
+    const failed = await runFanSchemes({
+      providers: ["seedream"],
+      arkKey: "test-ark-key",
+      geminiKey: "gemini-key-must-not-be-used",
+      project,
+      sourcePhotoFor: () => "/seed/fan/fan-before.jpg",
+      log: (line) => logs.push(line),
+      error: (line) => errors.push(line),
+    });
+    expect(failed === 1, "Seedream failures exit non-zero");
+    expect(urls.length === project.schemes.length, "every scheme is attempted");
+    expect(urls.every((url) => url.startsWith("https://ark.cn-beijing.volces.com/")), "failures stay on Seedream");
+    expect(!urls.some((url) => url.includes("generativelanguage.googleapis.com")), "a Seedream failure does not call Gemini");
+    expect(errors.length === project.schemes.length, "each failed scheme is reported");
+    expect(logs.every((line) => line.startsWith("Seedream ")), "logs name Seedream");
+
+    const skipped: string[] = [];
+    const empty = await runFanSchemes({
+      providers: ["seedream"],
+      arkKey: "",
+      geminiKey: "gemini-key-must-not-be-used",
+      project,
+      sourcePhotoFor: () => "/seed/fan/fan-before.jpg",
+      error: (line) => skipped.push(line),
+      generateSeedream: () => {
+        throw new Error("Seedream should not be called");
+      },
+      generateGemini: () => {
+        throw new Error("Gemini should not be called");
+      },
+    });
+    expect(empty === 1 && skipped[0]?.includes("ARK_API_KEY is empty"), "empty Seedream key exits before a call");
+
     const missingKey = spawnSync(process.execPath, [path.join("node_modules", "tsx", "dist", "cli.mjs"), "scripts/gen-fan.ts"], {
       cwd: process.cwd(),
       encoding: "utf8",
-      env: { ...process.env, GEMINI_API_KEY: "" },
+      env: { ...process.env, ARK_API_KEY: "", GEMINI_API_KEY: "present-but-must-not-be-used" },
     });
-    expect(missingKey.status === 1, "gen:fan exits when the key is empty");
-    expect(missingKey.stderr.includes("GEMINI_API_KEY is empty"), "gen:fan names the missing key");
-    expect(missingKey.stderr.includes("Gemini was not called"), "gen:fan does not call Gemini without a key");
+    expect(missingKey.status === 1, "gen:fan exits when the Seedream key is empty");
+    expect(missingKey.stderr.includes("ARK_API_KEY is empty"), "gen:fan names the Seedream key");
+    expect(missingKey.stderr.includes("Seedream was not called"), "gen:fan does not call Seedream without a key");
+    expect(!missingKey.stdout.includes("Gemini"), "gen:fan does not start Gemini");
 
     console.log("image-gen checks ok");
   } finally {

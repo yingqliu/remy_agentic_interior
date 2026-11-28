@@ -74,7 +74,7 @@ export async function generateWithGemini(
   key: string,
   model: string,
   request: GenerateRequest,
-  options?: { outputBase?: string },
+  options?: { outputBase?: string; folder?: string },
 ): Promise<GenerateResult> {
   const photo = await readSourcePhoto(request.sourcePhoto);
   if ("error" in photo) {
@@ -148,7 +148,7 @@ export async function generateWithGemini(
       };
     }
     const ext = extensionForMime(image.mime);
-    const name = outputFileName(options?.outputBase, ext);
+    const name = outputFileName(options?.outputBase, ext, options?.folder);
     const dir = path.join(process.cwd(), "public", "uploads");
     await mkdir(path.dirname(path.join(dir, name)), { recursive: true });
     await writeFile(path.join(dir, name), Buffer.from(image.data, "base64"));
@@ -211,8 +211,9 @@ function locatePublicImage(src: string): { abs: string; mime: string } | { error
   return { abs, mime };
 }
 
-function outputFileName(outputBase: string | undefined, ext: string): string {
-  if (outputBase && /^[a-z0-9-]+$/.test(outputBase)) return `fan/${outputBase}.${ext}`;
+function outputFileName(outputBase: string | undefined, ext: string, folder?: string): string {
+  const dir = folder && /^fan(?:\/[a-z0-9-]+)?$/.test(folder) ? folder : "fan";
+  if (outputBase && /^[a-z0-9-]+$/.test(outputBase)) return `${dir}/${outputBase}.${ext}`;
   return `gen-${Date.now()}.${ext}`;
 }
 
