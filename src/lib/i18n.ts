@@ -128,6 +128,8 @@ export const zh = {
   loginLink: "登录占位",
   howToLook: "怎么看",
   howToLookBody: "点击图可放大。挡水、入口在各方案上单独调整。若某组合暂无专图，会显示最接近的图并注明。",
+  compareFactors: "各方案对比",
+  compareClose: "关闭",
 } as const;
 
 export type MessageKey = keyof typeof zh;
@@ -262,6 +264,8 @@ export const en: Record<MessageKey, string> = {
   loginLink: "Sign-in placeholder",
   howToLook: "How to read this",
   howToLookBody: "Click a still to enlarge. Splash and entry are per scheme. If a mix has no dedicated still, the closest one is shown and labeled.",
+  compareFactors: "Compare across schemes",
+  compareClose: "Close",
 };
 
 export type Locale = "zh" | "en";
