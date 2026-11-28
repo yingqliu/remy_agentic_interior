@@ -1,6 +1,7 @@
 "use client";
 
-import type { ProjectDTO, SelectionState } from "@/lib/types";
+import type { GenerationDTO, ProjectDTO, SelectionState } from "@/lib/types";
+import { readyImageForScheme, readyImageWithoutScheme } from "@/lib/generated-image";
 import { resolveCompareText, schemeOptions, structureStill } from "@/lib/visuals";
 import { Button, Pill } from "@/components/ui";
 import { FrameImage } from "./frame-image";
@@ -14,18 +15,21 @@ import type { Still } from "@/lib/visuals";
 export function StructureStep({
   project,
   selection,
+  generations,
   onOption,
   onStructure,
   onOpen,
 }: {
   project: ProjectDTO;
   selection: SelectionState;
+  generations: GenerationDTO[];
   onOption: (schemeKey: string, groupKey: string, optionKey: string) => void;
   onStructure: (key: string | "maybe") => void;
   onOpen: (still: Still) => void;
 }) {
   const { t, locale } = useT();
   const pending = missingDimensions(project, selection).length > 0;
+  const roomImage = readyImageWithoutScheme(generations);
   if (project.schemes.length === 0) {
     return (
       <section id="step-1" className="scroll-mt-24">
@@ -33,6 +37,7 @@ export function StructureStep({
         <div className="mt-4 rounded-lg border border-dashed border-line bg-paper p-4">
           <p className="font-medium">{t("emptySchemes")}</p>
           <p className="mt-1 text-sm text-muted">{t("emptySchemesBody")}</p>
+          {roomImage ? <GeneratedStill src={roomImage} caption={t("generatedCaption")} /> : null}
         </div>
       </section>
     );
@@ -43,16 +48,23 @@ export function StructureStep({
       <div className="mt-3">
         <HoverNote label={t("howToLook")}>{t("howToLookBody")}</HoverNote>
       </div>
+      {roomImage ? (
+        <div className="mt-4 max-w-xl">
+          <GeneratedStill src={roomImage} caption={t("generatedCaption")} />
+        </div>
+      ) : null}
       <div className="mt-4 overflow-x-auto pb-2">
         <div className="grid min-w-[960px] grid-cols-4 gap-4">
           {project.schemes.map((scheme) => {
             const still = structureStill(scheme, selection);
+            const generatedSrc = readyImageForScheme(generations, scheme.key);
             const options = schemeOptions(scheme, selection);
             const name = locale === "en" && scheme.nameEn ? scheme.nameEn : scheme.name;
             return (
               <article key={scheme.key} className="min-w-0">
                 <h3 className="text-base font-medium">{name}</h3>
                 {scheme.summary ? <p className="mt-1 text-xs text-copper">{scheme.summary}</p> : null}
+                {generatedSrc ? <GeneratedStill src={generatedSrc} alt={scheme.imageAlt} caption={t("generatedCaption")} /> : null}
                 {still ? (
                   <div className="mt-2">
                     <FrameImage
@@ -120,5 +132,14 @@ export function StructureStep({
         </Button>
       </div>
     </section>
+  );
+}
+
+function GeneratedStill({ src, alt = "", caption }: { src: string; alt?: string; caption: string }) {
+  return (
+    <div className="mt-2">
+      <img src={src} alt={alt} className="w-full rounded-md bg-sand object-contain" style={{ aspectRatio: "1280 / 800" }} />
+      <p className="mt-1 text-xs leading-relaxed text-muted">{caption}</p>
+    </div>
   );
 }

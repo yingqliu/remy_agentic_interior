@@ -41,7 +41,9 @@ npm run dev
 - Client: http://localhost:3000/c/fan-jie-bath
 - New project: http://localhost:3000/projects/new
 
-Other scripts: `npm run typecheck`, `npm run lint`, `npm run check` (render-matching checks against the seed catalog), `npm run db:seed` (re-seeds 樊家 and replaces that project only).
+Set `OPENAI_API_KEY` to generate with OpenAI `gpt-image-1` (`POST /v1/images/generations`); leave it unset and the stub records the prompt without returning an image.
+
+Other scripts: `npm run typecheck`, `npm run lint`, `npm run check` (render-matching checks against the seed catalog), `npm run test` (gpt-image-1 provider and missing-key fallback), `npm run db:seed` (re-seeds 樊家 and replaces that project only).
 
 To use Postgres, change the datasource provider, point `DATABASE_URL` at the server, and run `npm run setup`. The `file:` path shim only applies to SQLite URLs.
 
@@ -62,8 +64,9 @@ Cost (`$`–`$$$$$`) and timeline show on the preset and on a hotspot only when 
 
 Image generation is behind `ImageProvider` in `src/server/image-gen/`.
 
-- **Stub** (`stub.ts`), the default. Records the prompt and stores a `Generation` row. It does not return pixels and does not pretend the before photo is a remodel.
-- **HTTP adapter** (`http-adapter.ts`), clearly marked, used only when both `IMAGE_API_BASE` and `IMAGE_API_KEY` are set. OpenAI-compatible `POST /images/generations`. No key is committed. A returned image is saved under `public/uploads` and on the generation row. It is not written onto a scheme, so a live key cannot replace the 樊家 stills.
+- **Stub** (`stub.ts`), the default when `OPENAI_API_KEY` is unset. Records the prompt and stores a `Generation` row. It does not return pixels and does not pretend the before photo is a remodel.
+- **OpenAI** (`openai.ts`), used when `OPENAI_API_KEY` is set. Calls `gpt-image-1` at `POST https://api.openai.com/v1/images/generations`. `b64_json` is decoded into `public/uploads`; a returned `url` is used as-is. The image is shown on the scheme comparison and on the generation row. It is not written onto a scheme, so a live key cannot replace the 樊家 stills.
+- **HTTP adapter** (`http-adapter.ts`), used only when `OPENAI_API_KEY` is blank and both `IMAGE_API_BASE` and `IMAGE_API_KEY` are set. OpenAI-compatible `POST /images/generations`. No key is committed. A returned image is saved under `public/uploads` and on the generation row. It is not written onto a scheme.
 
 Every prompt, including the stub's, includes hard constraints: do not invent windows, doors, skylights, or other openings that are not in the source photo or the written requirements; do not add structure the scheme does not call for; do not move fixtures to improve the picture. Project-level constraints are stored on the project and added as well.
 

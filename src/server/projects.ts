@@ -131,7 +131,7 @@ function toProject(record: ProjectRecord): ProjectDTO | null {
     })),
   }));
   const generations: GenerationDTO[] = record.generations.map((row) => {
-    const result = (row.result ?? {}) as { message?: string; imageSrc?: string | null };
+    const result = (row.result ?? {}) as { message?: string; imageSrc?: string | null; schemeKey?: string | null };
     return {
       id: row.id,
       provider: row.provider,
@@ -139,6 +139,7 @@ function toProject(record: ProjectRecord): ProjectDTO | null {
       prompt: row.prompt,
       message: result.message ?? null,
       imageSrc: result.imageSrc ?? null,
+      schemeKey: typeof result.schemeKey === "string" && result.schemeKey ? result.schemeKey : null,
       createdAt: row.createdAt.toISOString(),
     };
   });
@@ -321,7 +322,10 @@ function uniqueSlug(title: string): string {
   return `${stem}-${randomBytes(3).toString("hex")}`;
 }
 
-export async function recordGeneration(slug: string, result: { provider: string; status: string; prompt: string; message: string; imageSrc: string | null }) {
+export async function recordGeneration(
+  slug: string,
+  result: { provider: string; status: string; prompt: string; message: string; imageSrc: string | null; schemeKey?: string | null },
+) {
   const project = await prisma.project.findUnique({ where: { slug }, select: { id: true } });
   if (!project) return null;
   return prisma.generation.create({
@@ -330,7 +334,7 @@ export async function recordGeneration(slug: string, result: { provider: string;
       provider: result.provider,
       status: result.status,
       prompt: result.prompt,
-      result: { message: result.message, imageSrc: result.imageSrc },
+      result: { message: result.message, imageSrc: result.imageSrc, schemeKey: result.schemeKey ?? null },
     },
   });
 }

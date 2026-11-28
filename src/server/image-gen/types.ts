@@ -5,6 +5,8 @@ export type GenerateRequest = {
   sourcePhoto: string;
   requirements: string[];
   constraints: string[];
+  schemeKey: string | null;
+  schemeName: string | null;
   prompt: string;
 };
 

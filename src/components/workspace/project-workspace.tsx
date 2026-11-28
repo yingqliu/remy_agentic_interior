@@ -126,8 +126,10 @@ export function ProjectWorkspace({
           try {
             const response = await fetch(`/api/projects/${project.slug}/generate`, { method: "POST" });
             if (!response.ok) return;
-            const body = (await response.json()) as { generation: GenerationDTO };
-            setGenerations((prev) => [body.generation, ...prev]);
+            const body = (await response.json()) as { generations?: GenerationDTO[]; generation?: GenerationDTO | null };
+            const incoming = body.generations ?? (body.generation ? [body.generation] : []);
+            if (incoming.length === 0) return;
+            setGenerations((prev) => [...incoming, ...prev]);
           } finally {
             setGenerating(false);
           }
@@ -387,6 +389,7 @@ function WorkspaceBody(props: {
         <StructureStep
           project={project}
           selection={props.selection}
+          generations={props.generations}
           onOption={props.onOption}
           onStructure={props.onStructure}
           onOpen={props.setLightbox}
@@ -424,7 +427,8 @@ function WorkspaceBody(props: {
               {props.generations.map((item) => (
                 <li key={item.id} className="rounded-md border border-line p-3 text-sm">
                   <p>
-                    {item.provider === "http" ? t("providerHttp") : t("providerStub")}
+                    {item.provider === "openai" ? t("providerOpenAI") : item.provider === "http" ? t("providerHttp") : t("providerStub")}
+                    {item.schemeKey ? ` · ${project.schemes.find((scheme) => scheme.key === item.schemeKey)?.name ?? item.schemeKey}` : ""}
                     {" · "}
                     {item.status === "ready" ? t("statusReady") : item.status === "error" ? t("statusError") : t("statusStubbed")}
                   </p>

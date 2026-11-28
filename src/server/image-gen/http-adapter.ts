@@ -3,11 +3,11 @@ import path from "node:path";
 import type { GenerateRequest, GenerateResult, ImageProvider } from "./types";
 
 /**
- * REAL IMAGE API ADAPTER
- * -----------------------
- * This is the only module that calls a hosted image model.
- * It stays inactive until both IMAGE_API_BASE and IMAGE_API_KEY are set.
- * Do not commit keys. See .env.example.
+ * GENERIC IMAGE API ADAPTER
+ * -------------------------
+ * Optional OpenAI-compatible endpoint. Inactive until both IMAGE_API_BASE and
+ * IMAGE_API_KEY are set, and skipped entirely when OPENAI_API_KEY is set
+ * (that key uses gpt-image-1 in openai.ts). Do not commit keys. See .env.example.
  *
  * The seeded 樊家 demo does not call this adapter. A successful response is
  * stored under public/uploads and on the Generation row. It is not written
