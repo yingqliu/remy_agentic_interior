@@ -47,24 +47,25 @@ model Room {
 /// A structural layout. Decor is a project-level palette applied on top,
 /// so finish choices survive when the client changes scheme.
 model Scheme {
-  id           String        @id @default(cuid())
-  projectId    String
-  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  key          String
-  name         String
-  nameEn       String?
-  sortOrder    Int
-  summary      String?
-  summaryLines Json?
-  imageAlt     String
-  decorMode    String
-  decorCaveat  String?
-  decorGrid    Json?
-  plan         Json?
-  hotspots     Json
-  compareRows  Json
-  optionGroups OptionGroup[]
-  renders      Render[]
+  id                    String        @id @default(cuid())
+  projectId             String
+  project               Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  key                   String
+  name                  String
+  nameEn                String?
+  sortOrder             Int
+  summary               String?
+  summaryLines          Json?
+  imageAlt              String
+  decorMode             String
+  decorCaveat           String?
+  decorGrid             Json?
+  plan                  Json?
+  hotspots              Json
+  compareRows           Json
+  generationConstraints Json          @default("[]")
+  optionGroups          OptionGroup[]
+  renders               Render[]
 
   @@unique([projectId, key])
 }

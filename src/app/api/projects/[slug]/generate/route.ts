@@ -4,13 +4,16 @@ import { getProjectBySlug, recordGeneration } from "@/server/projects";
 
 export const runtime = "nodejs";
 
-export async function POST(_request: Request, context: { params: Promise<{ slug: string }> }) {
+export async function POST(request: Request, context: { params: Promise<{ slug: string }> }) {
   const { slug } = await context.params;
   const project = await getProjectBySlug(slug);
   if (!project) return NextResponse.json({ error: "not_found" }, { status: 404 });
+  const schemeKey = new URL(request.url).searchParams.get("scheme")?.trim() || null;
+  const scheme = schemeKey ? project.schemes.find((item) => item.key === schemeKey) : null;
+  if (schemeKey && !scheme) return NextResponse.json({ error: "scheme_not_found" }, { status: 404 });
   const provider = getImageProvider();
-  const request = buildGenerationRequest(project);
-  const result = await provider.generate(request);
+  const generationRequest = buildGenerationRequest(project, scheme);
+  const result = await provider.generate(generationRequest);
   const row = await recordGeneration(slug, result);
   if (!row) return NextResponse.json({ error: "not_found" }, { status: 404 });
   return NextResponse.json({

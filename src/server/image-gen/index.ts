@@ -7,4 +7,4 @@ export function getImageProvider(): ImageProvider {
 }
 
 export type { GenerateRequest, GenerateResult, ImageProvider } from "./types";
-export { buildGenerationRequest } from "./prompt";
+export { STRUCTURAL_LOCKS, UNIVERSAL_CONSTRAINTS, buildGenerationRequest, constraintsFor, structuralLockConstraint } from "./prompt";

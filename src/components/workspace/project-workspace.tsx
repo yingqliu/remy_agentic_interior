@@ -124,7 +124,9 @@ export function ProjectWorkspace({
         onGenerate={async () => {
           setGenerating(true);
           try {
-            const response = await fetch(`/api/projects/${project.slug}/generate`, { method: "POST" });
+            const schemeKey = selection.structureKey;
+            const query = schemeKey ? `?scheme=${encodeURIComponent(schemeKey)}` : "";
+            const response = await fetch(`/api/projects/${project.slug}/generate${query}`, { method: "POST" });
             if (!response.ok) return;
             const body = (await response.json()) as { generation: GenerationDTO };
             setGenerations((prev) => [body.generation, ...prev]);

@@ -129,6 +129,8 @@ export type SchemeDTO = {
   compareRows: CompareRow[];
   optionGroups: OptionGroupDTO[];
   renders: RenderDTO[];
+  /** Appended to the image prompt only when this scheme is selected. */
+  generationConstraints: string[];
 };
 
 export type DecorChoice = { key: string; label: string; color: string };

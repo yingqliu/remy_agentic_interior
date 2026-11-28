@@ -102,6 +102,7 @@ function toProject(record: ProjectRecord): ProjectDTO | null {
     plan: (scheme.plan as PlanDTO | null) ?? null,
     hotspots: (scheme.hotspots as HotspotDTO[]) ?? [],
     compareRows: (scheme.compareRows as CompareRow[]) ?? [],
+    generationConstraints: asArray(scheme.generationConstraints, asString),
     optionGroups: scheme.optionGroups.map((group) => ({
       key: group.key,
       label: group.label,

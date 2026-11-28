@@ -65,9 +65,9 @@ Image generation is behind `ImageProvider` in `src/server/image-gen/`.
 - **Stub** (`stub.ts`), the default. Records the prompt and stores a `Generation` row. It does not return pixels and does not pretend the before photo is a remodel.
 - **HTTP adapter** (`http-adapter.ts`), clearly marked, used only when both `IMAGE_API_BASE` and `IMAGE_API_KEY` are set. OpenAI-compatible `POST /images/generations`. No key is committed. A returned image is saved under `public/uploads` and on the generation row. It is not written onto a scheme, so a live key cannot replace the 樊家 stills.
 
-Every prompt, including the stub's, includes hard constraints: do not invent windows, doors, skylights, or other openings that are not in the source photo or the written requirements; do not add structure the scheme does not call for; do not move fixtures to improve the picture. Project-level constraints are stored on the project and added as well.
+Every prompt, including the stub's, includes hard constraints: do not invent openings that are not in the source photo or the written requirements; do not move, add, or resize windows; do not add structure the selected scheme does not call for; do not move fixtures to improve the picture. Structural locks (sliding doors, sliding windows, hallway door openings, kitchen door openings, ceiling height, and camera viewpoint) apply only when that element is already in the source photo, and the prompt must not tell the model to add one that is absent. A television is not preset: it may be added only on a dry wall with an unobstructed sightline, never on or instead of a window. Anything the requirements and the selected scheme do not explicitly ask to change stays as built. Project-level constraints are stored on the project. Scheme-level constraints are stored on the scheme and included when the request names that scheme (`POST /api/projects/{slug}/generate?scheme={key}`).
 
-`记录一次生成请求` on the studio page exercises this path.
+`记录一次生成请求` on the studio page exercises this path. If a structure scheme is selected, the request uses that scheme.
 
 ## Decisions worth passing on
 

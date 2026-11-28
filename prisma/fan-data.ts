@@ -271,6 +271,38 @@ function panelRows(): CompareRow[] {
   ];
 }
 
+/** Facts that apply to every 樊家 scheme. Dimensions are inches. */
+const FAN_STRUCTURE_FACTS = [
+  "All dimensions in this project are inches.",
+  "The back wall, the wall the source photograph faces, is 70 inches wide.",
+  "There is exactly one existing window. It is high on the right side of the back wall, in the same position as in the source photograph and as in 方案一. Never move, add, or resize it.",
+  "Where a scheme includes a tub, the tub is a standard 60-inch tub.",
+  "The source photograph of this bathroom shows no sliding door, no hallway door opening, and no kitchen door opening. Do not add them.",
+];
+
+/**
+ * Layout facts for one scheme. These are hard constraints only when that
+ * scheme is selected. None of them preset a television.
+ */
+const SCHEME_GENERATION_CONSTRAINTS: Record<string, string[]> = {
+  open: [
+    "方案一: tiled shower on the left of the back wall, a fixed glass panel separating the vanity zone, and a freestanding tub on the right. The vanity is a double sink about 48 inches wide by 20 inches deep. Do not add a stub wall or a tub-rim ledge.",
+    "Keep the existing window high on the right side of the back wall. This scheme is the reference position for that window: do not move, add, or resize it.",
+  ],
+  wetroom: [
+    "方案一变体: freestanding tub against the left wall, shower on the right portion of the back wall, and a double vanity about 48 inches wide by 20 inches deep on the right. Do not add a stub wall or a tub-rim ledge.",
+    "Keep the existing window high on the right side of the back wall, in the same position as 方案一. Do not cover, block, or replace it.",
+  ],
+  alcove: [
+    "短墙嵌缸: the stub wall is on the LEFT. It is about 10 inches thick/wide, taken out of the 70-inch back wall, leaving exactly the 60-inch tub alcove. Place a standard 60-inch tub in that alcove.",
+    "The shower head is on the left end wall of the tub, and the person stands in the tub to shower. Keep the 54-inch double vanity on the right wall. Do not move the window.",
+  ],
+  panel: [
+    "缸沿平台: do not add a stub wall. Place a standard 60-inch tub against the back wall, and fill the rest of the 70-inch back wall with a ledge whose top is level with the tub rim.",
+    "The person stands in the tub to shower. Keep the 54-inch double vanity on the right wall. Keep the existing window high on the right side of the back wall.",
+  ],
+};
+
 const schemes: SchemeDTO[] = [
   {
     key: "open",
@@ -327,6 +359,7 @@ const schemes: SchemeDTO[] = [
       },
     ],
     compareRows: openRows(),
+    generationConstraints: SCHEME_GENERATION_CONSTRAINTS.open,
     optionGroups: [splashGroup(), entryGroup()],
     renders: [
       ...splashEntryStills(
@@ -396,6 +429,7 @@ const schemes: SchemeDTO[] = [
       },
     ],
     compareRows: wetRows(),
+    generationConstraints: SCHEME_GENERATION_CONSTRAINTS.wetroom,
     optionGroups: [splashGroup(), entryGroup()],
     renders: [
       ...splashEntryStills(
@@ -474,6 +508,7 @@ const schemes: SchemeDTO[] = [
       },
     ],
     compareRows: alcoveRows(),
+    generationConstraints: SCHEME_GENERATION_CONSTRAINTS.alcove,
     optionGroups: [splashGroup(), entryGroup(ENTRY_NA)],
     renders: [
       ...splashOnlyStills((splash) =>
@@ -535,6 +570,7 @@ const schemes: SchemeDTO[] = [
       },
     ],
     compareRows: panelRows(),
+    generationConstraints: SCHEME_GENERATION_CONSTRAINTS.panel,
     optionGroups: [splashGroup(), entryGroup(ENTRY_NA)],
     renders: [
       ...splashOnlyStills((splash) => ({
@@ -596,6 +632,7 @@ export function buildFanProject(): ProjectDTO {
       "不新开窗，不新开门，不加天窗。不得添加现状照片或需求里没有的洞口。",
       "不得为了构图移动花洒、浴缸、台盆或窗。位置以选定的结构方案为准。",
       "不得添加方案文字里没有的墙、梁、夹层或室外景色。",
+      ...FAN_STRUCTURE_FACTS,
     ],
     room: {
       kind: "bathroom",

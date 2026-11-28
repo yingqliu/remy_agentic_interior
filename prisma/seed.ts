@@ -19,6 +19,7 @@ function schemeCreate(scheme: SchemeDTO): Prisma.SchemeCreateWithoutProjectInput
     plan: scheme.plan ?? Prisma.JsonNull,
     hotspots: scheme.hotspots,
     compareRows: scheme.compareRows,
+    generationConstraints: scheme.generationConstraints,
     optionGroups: {
       create: scheme.optionGroups.map((group) => ({
         key: group.key,
