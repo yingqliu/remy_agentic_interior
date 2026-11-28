@@ -3,33 +3,36 @@ import path from "node:path";
 import type { GenerateRequest, GenerateResult, ImageProvider } from "./types";
 
 /**
- * REAL IMAGE API ADAPTER
- * -----------------------
- * This is the only module that calls a hosted image model.
- * It stays inactive until both IMAGE_API_BASE and IMAGE_API_KEY are set.
- * Do not commit keys. See .env.example.
+ * OPENAI-COMPATIBLE IMAGE ADAPTER
+ * --------------------------------
+ * Used when the Gemini provider is not selected and both IMAGE_API_BASE and
+ * IMAGE_API_KEY are set. Do not commit keys. See .env.example.
  *
- * The seeded 樊家 demo does not call this adapter. A successful response is
- * stored under public/uploads and on the Generation row. It is not written
- * back onto a scheme, so a live key cannot overwrite the demo stills.
+ * A successful response is stored under public/uploads and on the Generation
+ * row. It is not written back onto a scheme.
  *
- * Expected shape: OpenAI-compatible POST {IMAGE_API_BASE}/images/generations
- * with Authorization: Bearer IMAGE_API_KEY. The source photo path is included
- * in the prompt. Reference-image editing (multipart /images/edits) is the
- * next step for this adapter; this version sends the prompt only.
+ * Expected shape: POST {IMAGE_API_BASE}/images/generations with
+ * Authorization: Bearer IMAGE_API_KEY. The default model is gpt-image-2.6-flare
+ * (gpt-image-1 was shut down). `quality` is the OpenAI images field
+ * (low, medium, high, or auto), from IMAGE_API_QUALITY, default medium.
+ * This adapter sends the prompt only. It does not upload the source photo.
  */
+export const DEFAULT_HTTP_IMAGE_MODEL = "gpt-image-2.6-flare";
+export const DEFAULT_HTTP_IMAGE_QUALITY = "medium";
+
 export function httpProviderFromEnv(): ImageProvider | null {
   const base = process.env.IMAGE_API_BASE?.trim();
   const key = process.env.IMAGE_API_KEY?.trim();
   if (!base || !key) return null;
-  const model = process.env.IMAGE_API_MODEL?.trim() || "gpt-image-1";
+  const model = process.env.IMAGE_API_MODEL?.trim() || DEFAULT_HTTP_IMAGE_MODEL;
+  const quality = process.env.IMAGE_API_QUALITY?.trim() || DEFAULT_HTTP_IMAGE_QUALITY;
   return {
     id: "http",
-    generate: (request) => generateWithHttp(base, key, model, request),
+    generate: (request) => generateWithHttp(base, key, model, quality, request),
   };
 }
 
-async function generateWithHttp(base: string, key: string, model: string, request: GenerateRequest): Promise<GenerateResult> {
+async function generateWithHttp(base: string, key: string, model: string, quality: string, request: GenerateRequest): Promise<GenerateResult> {
   const endpoint = `${base.replace(/\/$/, "")}/images/generations`;
   try {
     const response = await fetch(endpoint, {
@@ -42,6 +45,7 @@ async function generateWithHttp(base: string, key: string, model: string, reques
         model,
         prompt: request.prompt,
         size: "1536x1024",
+        quality,
         n: 1,
       }),
     });

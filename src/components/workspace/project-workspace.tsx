@@ -426,7 +426,7 @@ function WorkspaceBody(props: {
               {props.generations.map((item) => (
                 <li key={item.id} className="rounded-md border border-line p-3 text-sm">
                   <p>
-                    {item.provider === "http" ? t("providerHttp") : t("providerStub")}
+                    {item.provider === "http" ? t("providerHttp") : item.provider === "gemini" ? t("providerGemini") : t("providerStub")}
                     {" · "}
                     {item.status === "ready" ? t("statusReady") : item.status === "error" ? t("statusError") : t("statusStubbed")}
                   </p>
