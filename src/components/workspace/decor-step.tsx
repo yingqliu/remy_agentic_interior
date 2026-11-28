@@ -2,7 +2,7 @@
 
 import type { ProjectDTO, SelectionState } from "@/lib/types";
 import { missingDimensions } from "@/lib/selection";
-import { activeScheme, colorsEqual, presetStill, schemeOptions, workingPreset, type Still } from "@/lib/visuals";
+import { activeScheme, colorsEqual, overlaySeedream, presetByColors, presetStill, schemeOptions, workingPreset, type Still } from "@/lib/visuals";
 import { Button, ImpactTag, Swatches } from "@/components/ui";
 import { FrameImage } from "./frame-image";
 import { HotspotStage } from "./hotspot-stage";
@@ -47,10 +47,20 @@ export function DecorStep({
   if (!scheme || presets.length === 0) return null;
   const working = workingPreset(project, selection) ?? presets[0];
   const splash = schemeOptions(scheme, selection).splash;
-  const main =
+  const mainPresetKey =
+    scheme.decorMode === "colorGrid"
+      ? presetByColors(presets, selection.colors)?.key ?? null
+      : selection.preview.tile && selection.preview.tile !== working.key
+        ? selection.preview.tile
+        : working.key;
+  const main = overlaySeedream(
     scheme.decorMode === "colorGrid"
       ? presetStill(scheme, { ...working, colors: selection.colors }, {}, splash)
-      : presetStill(scheme, working, selection.preview, splash);
+      : presetStill(scheme, working, selection.preview, splash),
+    scheme.key,
+    { kind: "finish", presetKey: mainPresetKey },
+    project.seedream,
+  );
   const pendingDims = missingDimensions(project, selection).length > 0;
   const chosen = selection.structureKey && selection.structureKey !== "maybe";
   const schemeName = locale === "en" && scheme.nameEn ? scheme.nameEn : scheme.name;
@@ -74,6 +84,7 @@ export function DecorStep({
           {main ? (
             <HotspotStage
               still={main}
+              badge={main.origin === "seedream" ? t("stillSeedream") : main.origin === "sample" ? t("stillSample") : undefined}
               spots={scheme.hotspots}
               preset={working}
               presets={presets}
@@ -154,7 +165,12 @@ export function DecorStep({
         </div>
         <div className="flex gap-3 overflow-x-auto lg:flex-col">
           {presets.map((preset) => {
-            const thumb = presetStill(scheme, preset, scheme.decorMode === "colorGrid" ? {} : selection.preview, splash);
+            const thumb = overlaySeedream(
+              presetStill(scheme, preset, scheme.decorMode === "colorGrid" ? {} : selection.preview, splash),
+              scheme.key,
+              { kind: "finish", presetKey: preset.key },
+              project.seedream,
+            );
             const isOn = scheme.decorMode === "colorGrid" ? colorsEqual(selection.colors, preset.colors) : preset.key === working.key;
             const committed = selection.decorPreset === preset.key;
             return (
@@ -166,7 +182,15 @@ export function DecorStep({
                   isOn ? "border-copper" : "border-line"
                 } ${committed ? "bg-copperSoft" : "bg-paper"}`}
               >
-                {thumb ? <FrameImage src={thumb.src} alt={thumb.alt} frames={thumb.frames} frame={thumb.frame} /> : null}
+                {thumb ? (
+                  <FrameImage
+                    src={thumb.src}
+                    alt={thumb.alt}
+                    frames={thumb.frames}
+                    frame={thumb.frame}
+                    badge={thumb.origin === "seedream" ? t("stillSeedream") : thumb.origin === "sample" ? t("stillSample") : undefined}
+                  />
+                ) : null}
                 <span className="block px-2 py-1.5">
                   <span className="block text-xs font-medium">{locale === "en" && preset.nameEn ? preset.nameEn : preset.name}</span>
                   <ImpactTag cost={preset.costBand} timeline={preset.timelineBand} significant={preset.significant} timeLabel={t("impactTime")} />

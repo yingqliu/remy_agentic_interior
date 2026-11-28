@@ -490,7 +490,13 @@ function WorkspaceBody(props: {
       {props.lightbox ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6" onClick={() => props.setLightbox(null)}>
           <div className="w-full max-w-5xl" onClick={(event) => event.stopPropagation()}>
-            <FrameImage src={props.lightbox.src} alt={props.lightbox.alt} frames={props.lightbox.frames} frame={props.lightbox.frame} />
+            <FrameImage
+              src={props.lightbox.src}
+              alt={props.lightbox.alt}
+              frames={props.lightbox.frames}
+              frame={props.lightbox.frame}
+              badge={props.lightbox.origin === "seedream" ? t("stillSeedream") : props.lightbox.origin === "sample" ? t("stillSample") : undefined}
+            />
             <p className="mt-2 text-xs text-white">{t("closeLightbox")}</p>
           </div>
         </div>

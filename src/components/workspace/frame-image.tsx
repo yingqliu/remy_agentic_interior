@@ -3,12 +3,14 @@ export function FrameImage({
   alt,
   frames = 1,
   frame = 0,
+  badge,
   onClick,
 }: {
   src: string;
   alt: string;
   frames?: number;
   frame?: number;
+  badge?: string;
   onClick?: () => void;
 }) {
   const total = Math.max(1, frames);
@@ -25,6 +27,11 @@ export function FrameImage({
         className="absolute top-0 h-full max-w-none select-none"
         style={{ width: `${total * 100}%`, left: `${-frame * 100}%` }}
       />
+      {badge ? (
+        <span className="pointer-events-none absolute left-2 top-2 z-[2] rounded bg-paper/85 px-1.5 py-0.5 text-[10px] leading-none text-muted">
+          {badge}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -36,6 +43,7 @@ export function HotspotThumb({
   y,
   frames = 1,
   frame = 0,
+  badge,
 }: {
   src: string;
   alt: string;
@@ -43,6 +51,7 @@ export function HotspotThumb({
   y: number;
   frames?: number;
   frame?: number;
+  badge?: string;
 }) {
   const windowPct = 32;
   let left = x - windowPct / 2;
@@ -61,7 +70,7 @@ export function HotspotThumb({
           top: `${-(top / windowPct) * 100}%`,
         }}
       >
-        <FrameImage src={src} alt={alt} frames={frames} frame={frame} />
+        <FrameImage src={src} alt={alt} frames={frames} frame={frame} badge={badge} />
       </div>
     </div>
   );

@@ -200,6 +200,12 @@ export type GenerationDTO = {
   accepted?: boolean | null;
 };
 
+/** Generated Seedream files found on disk. Keys are scheme keys; finish values are preset keys. */
+export type SeedreamCatalog = {
+  structure: string[];
+  finish: Record<string, string[]>;
+};
+
 export type ProjectDTO = {
   id: string;
   slug: string;
@@ -217,6 +223,7 @@ export type ProjectDTO = {
   schemes: SchemeDTO[];
   decor: DecorDTO;
   generations: GenerationDTO[];
+  seedream?: SeedreamCatalog | null;
 };
 
 export type DimensionValue = {

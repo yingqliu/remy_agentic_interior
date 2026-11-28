@@ -1,7 +1,7 @@
 "use client";
 
 import type { ProjectDTO, SelectionState } from "@/lib/types";
-import { resolveCompareText, schemeOptions, structureStill } from "@/lib/visuals";
+import { overlaySeedream, resolveCompareText, schemeOptions, structureStill } from "@/lib/visuals";
 import { Button, Pill } from "@/components/ui";
 import { FrameImage } from "./frame-image";
 import { HoverNote } from "./hover-note";
@@ -46,7 +46,7 @@ export function StructureStep({
       <div className="mt-4 overflow-x-auto pb-2">
         <div className="grid min-w-[960px] grid-cols-4 gap-4">
           {project.schemes.map((scheme) => {
-            const still = structureStill(scheme, selection);
+            const still = overlaySeedream(structureStill(scheme, selection), scheme.key, { kind: "structure" }, project.seedream);
             const options = schemeOptions(scheme, selection);
             const name = locale === "en" && scheme.nameEn ? scheme.nameEn : scheme.name;
             return (
@@ -60,6 +60,7 @@ export function StructureStep({
                       alt={still.alt}
                       frames={still.frames}
                       frame={still.frame}
+                      badge={still.origin === "seedream" ? t("stillSeedream") : still.origin === "sample" ? t("stillSample") : undefined}
                       onClick={() => onOpen(still)}
                     />
                     <p className="mt-1 text-xs leading-relaxed text-muted">

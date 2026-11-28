@@ -4,8 +4,39 @@ import type {
   RenderDTO,
   RenderWhen,
   SchemeDTO,
+  SeedreamCatalog,
   SelectionState,
 } from "./types";
+
+export function seedreamStructureSrc(schemeKey: string): string {
+  return `/uploads/fan/seedream/${schemeKey}/structure.jpg`;
+}
+
+export function seedreamFinishSrc(schemeKey: string, presetKey: string): string {
+  return `/uploads/fan/seedream/${schemeKey}/${presetKey}.jpg`;
+}
+
+export function overlaySeedream(
+  still: Still | null,
+  schemeKey: string,
+  slot: { kind: "structure" } | { kind: "finish"; presetKey: string | null },
+  catalog?: SeedreamCatalog | null,
+): Still | null {
+  if (!still || !catalog) return still;
+  const generated =
+    slot.kind === "structure"
+      ? catalog.structure.includes(schemeKey)
+        ? seedreamStructureSrc(schemeKey)
+        : null
+      : slot.presetKey && catalog.finish[schemeKey]?.includes(slot.presetKey)
+        ? seedreamFinishSrc(schemeKey, slot.presetKey)
+        : null;
+  if (generated) {
+    return { ...still, src: generated, frames: 1, frame: 0, origin: "seedream" };
+  }
+  if (still.src.startsWith("/seed/")) return { ...still, origin: "sample" };
+  return still;
+}
 
 export function matchRender(rules: RenderDTO[], ctx: RenderWhen): RenderDTO | null {
   let best: { score: number; rule: RenderDTO } | null = null;
@@ -56,6 +87,8 @@ export type Still = {
   note: string | null;
   exact: boolean;
   alt: string;
+  /** Set when a Seedream catalog was consulted. Missing files stay on the seed still. */
+  origin?: "seedream" | "sample";
 };
 
 function decorRules(scheme: SchemeDTO): RenderDTO[] {
