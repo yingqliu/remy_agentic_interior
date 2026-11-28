@@ -1,6 +1,7 @@
 "use client";
 
-import type { ProjectDTO, SelectionState } from "@/lib/types";
+import { useEffect, useRef, useState } from "react";
+import type { ProjectDTO, SchemeDTO, SelectionState } from "@/lib/types";
 import { resolveCompareText, schemeOptions, structureStill } from "@/lib/visuals";
 import { Button, Pill } from "@/components/ui";
 import { FrameImage } from "./frame-image";
@@ -26,6 +27,21 @@ export function StructureStep({
 }) {
   const { t, locale } = useT();
   const pending = missingDimensions(project, selection).length > 0;
+  const [activeFactor, setActiveFactor] = useState<string | null>(null);
+  const compareRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!activeFactor) return;
+    compareRef.current?.scrollIntoView({ block: "nearest" });
+  }, [activeFactor]);
+  const schemeName = (scheme: SchemeDTO) => (locale === "en" && scheme.nameEn ? scheme.nameEn : scheme.name);
+  const factorText = (scheme: SchemeDTO, label: string) => {
+    const row = scheme.compareRows.find((item) => item.label === label);
+    if (!row) return "";
+    return resolveCompareText(row.variants, schemeOptions(scheme, selection));
+  };
+  const toggleFactor = (label: string) => {
+    setActiveFactor((current) => (current === label ? null : label));
+  };
   if (project.schemes.length === 0) {
     return (
       <section id="step-1" className="scroll-mt-24">
@@ -48,7 +64,7 @@ export function StructureStep({
           {project.schemes.map((scheme) => {
             const still = structureStill(scheme, selection);
             const options = schemeOptions(scheme, selection);
-            const name = locale === "en" && scheme.nameEn ? scheme.nameEn : scheme.name;
+            const name = schemeName(scheme);
             return (
               <article key={scheme.key} className="min-w-0">
                 <h3 className="text-base font-medium">{name}</h3>
@@ -98,17 +114,47 @@ export function StructureStep({
                   </div>
                 ) : null}
                 <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1">
-                  {scheme.compareRows.map((row) => (
-                    <HoverNote key={row.label} label={row.label}>
-                      {resolveCompareText(row.variants, options)}
-                    </HoverNote>
-                  ))}
+                  {scheme.compareRows.map((row) => {
+                    const pressed = activeFactor === row.label;
+                    return (
+                      <button
+                        key={row.label}
+                        type="button"
+                        aria-pressed={pressed}
+                        aria-controls={pressed ? "scheme-compare" : undefined}
+                        onClick={() => toggleFactor(row.label)}
+                        className={`border-b pb-0.5 text-left text-xs ${
+                          pressed ? "border-solid border-copper font-medium text-copper" : "border-dashed border-line text-muted hover:text-ink"
+                        }`}
+                      >
+                        {row.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </article>
             );
           })}
         </div>
       </div>
+      {activeFactor ? (
+        <div ref={compareRef} id="scheme-compare" role="region" aria-label={t("compareFactors")} className="mt-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-medium">{activeFactor}</p>
+            <button type="button" className="text-xs text-muted underline decoration-line underline-offset-2 hover:text-ink" onClick={() => setActiveFactor(null)}>
+              {t("compareClose")}
+            </button>
+          </div>
+          <div className="mt-2 grid grid-cols-1 gap-2 min-[992px]:grid-cols-4 min-[992px]:gap-4">
+            {project.schemes.map((scheme) => (
+              <div key={scheme.key} className="rounded-md border border-line bg-paper p-3">
+                <p className="text-xs font-medium">{schemeName(scheme)}</p>
+                <p className="mt-1 text-xs leading-relaxed">{factorText(scheme, activeFactor)}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
       <div className="mt-4 flex flex-wrap gap-2">
         {project.schemes.map((scheme) => (
           <Button key={scheme.key} variant={selection.structureKey === scheme.key ? "primary" : "quiet"} onClick={() => onStructure(scheme.key)}>
