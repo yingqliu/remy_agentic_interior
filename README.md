@@ -62,12 +62,24 @@ Cost (`$`–`$$$$$`) and timeline show on the preset and on a hotspot only when 
 
 Image generation is behind `ImageProvider` in `src/server/image-gen/`.
 
+Provider choice: `IMAGE_PROVIDER=seedream` uses Seedream when `ARK_API_KEY` is set. `IMAGE_PROVIDER=gemini` uses Gemini when `GEMINI_API_KEY` is set. A missing key does not switch to the other image model. Otherwise the HTTP adapter is used when both `IMAGE_API_BASE` and `IMAGE_API_KEY` are set, then the stub. No key is committed.
+
 - **Stub** (`stub.ts`), the default. Records the prompt and stores a `Generation` row. It does not return pixels and does not pretend the before photo is a remodel.
-- **HTTP adapter** (`http-adapter.ts`), clearly marked, used only when both `IMAGE_API_BASE` and `IMAGE_API_KEY` are set. OpenAI-compatible `POST /images/generations`. No key is committed. A returned image is saved under `public/uploads` and on the generation row. It is not written onto a scheme, so a live key cannot replace the 樊家 stills.
+- **Seedream** (`seedream-adapter.ts`). Seedream 5.0 Pro, model id `doubao-seedream-5-0-pro-260628` ([Ark image generation](https://ark.volcengine.com/region:cn-beijing/docs/image-generation-api)). `POST https://ark.cn-beijing.volces.com/api/v3/images/generations` with `Authorization: Bearer`. The source photo is a `data:image/jpeg;base64,...` value in `image`. `size` is `2K`. The prompt asks for a 3:2 landscape frame because this model has no aspect field; the docs map 2K at 3:2 to 2496×1664. `watermark` is `false`. A returned image is saved under `public/uploads` and on the generation row, not onto a scheme.
+- **Gemini** (`gemini-adapter.ts`). Nano Banana 2.1, model id `gemini-nano-banana-2.1` ([pricing](https://ai.google.dev/gemini-api/docs/pricing), [image generation](https://ai.google.dev/gemini-api/docs/image-generation)). `POST https://generativelanguage.googleapis.com/v1beta/interactions` with the source photo read from `public/` (for the seed, `public/seed/fan/fan-before.jpg`) as inline base64, plus a prompt that says to edit that exact room (same camera, same window position, same walls). Output is `image_size` `2K` at aspect ratio `3:2` (2528×1696). The header is `x-goog-api-key`. A returned image is saved under `public/uploads` and on the generation row. It is not written onto a scheme.
+- **HTTP adapter** (`http-adapter.ts`). OpenAI-compatible `POST /images/generations`. Default model is `gpt-image-2.6-flare` (`IMAGE_API_MODEL` overrides it). `IMAGE_API_QUALITY` is sent as `quality` and defaults to `medium`. This adapter sends the prompt only and does not upload the source photo. A returned image is saved under `public/uploads` and on the generation row, not onto a scheme.
 
-Every prompt, including the stub's, includes hard constraints: do not invent windows, doors, skylights, or other openings that are not in the source photo or the written requirements; do not add structure the scheme does not call for; do not move fixtures to improve the picture. Project-level constraints are stored on the project and added as well.
+樊家 generation: `.env` is gitignored. Copy the filled file and set the two keys.
 
-`记录一次生成请求` on the studio page exercises this path.
+```
+cp .env.ready .env
+```
+
+`ARK_API_KEY` and `GEMINI_API_KEY` are the only empty values. `npm run gen:fan` runs Seedream only. For each of 方案一, 方案一变体, 短墙嵌缸, and 缸沿平台 it draws a structure image, retries once when that image is poor, then draws mist, wood, and ink from the approved structure. Files are `public/uploads/fan/seedream/<scheme>/structure.jpg` and `<scheme>/mist.jpg`, `wood.jpg`, and `ink.jpg`. A full run makes at most 20 Seedream calls. An empty `ARK_API_KEY` exits before any request. Passing `--provider gemini` exits without calling Gemini. The studio shows an upgrade placeholder for further customization.
+
+Every prompt, including the stub's, includes hard constraints: do not invent openings that are not in the source photo or the written requirements; do not move, add, or resize windows; do not add structure the selected scheme does not call for; do not move fixtures to improve the picture. Structural locks (sliding doors, sliding windows, hallway door openings, kitchen door openings, ceiling height, and camera viewpoint) apply only when that element is already in the source photo, and the prompt must not tell the model to add one that is absent. A television is not preset: it may be added only on a dry wall with an unobstructed sightline, never on or instead of a window. Anything the requirements and the selected scheme do not explicitly ask to change stays as built. Project-level constraints are stored on the project. Scheme-level constraints are stored on the scheme and included when the request names that scheme (`POST /api/projects/{slug}/generate?scheme={key}`).
+
+`生成结构与三套饰面` on the studio page runs the same Seedream flow. Each structure can be regenerated once more, and the total stays at two attempts.
 
 ## Decisions worth passing on
 

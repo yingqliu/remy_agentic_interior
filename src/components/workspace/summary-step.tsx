@@ -39,7 +39,13 @@ export function SummaryStep({
           <h3 className="text-sm font-medium">{t("decidedImage")}</h3>
           {summary.still ? (
             <figure>
-              <FrameImage src={summary.still.src} alt={t("conceptAlt")} frames={summary.still.frames} frame={summary.still.frame} />
+              <FrameImage
+                src={summary.still.src}
+                alt={t("conceptAlt")}
+                frames={summary.still.frames}
+                frame={summary.still.frame}
+                badge={summary.still.origin === "seedream" ? t("stillSeedream") : summary.still.origin === "sample" ? t("stillSample") : undefined}
+              />
               <figcaption className="mt-1 text-xs text-muted">
                 {summary.structureUnsetImage && scheme == null
                   ? t("structurePreviewCaption", {
@@ -81,7 +87,15 @@ export function SummaryStep({
             {summary.selected.map((item) => (
               <li key={`${item.presetKey}:${item.key}`} className="flex items-center gap-3">
                 {item.still ? (
-                  <HotspotThumb src={item.still.src} alt={item.title} x={item.x} y={item.y} frames={item.still.frames} frame={item.still.frame} />
+                  <HotspotThumb
+                    src={item.still.src}
+                    alt={item.title}
+                    x={item.x}
+                    y={item.y}
+                    frames={item.still.frames}
+                    frame={item.still.frame}
+                    badge={item.still.origin === "seedream" ? t("stillSeedream") : item.still.origin === "sample" ? t("stillSample") : undefined}
+                  />
                 ) : null}
                 <span>
                   <span className="block text-sm font-medium">{item.title}</span>

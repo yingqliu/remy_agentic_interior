@@ -129,6 +129,8 @@ export type SchemeDTO = {
   compareRows: CompareRow[];
   optionGroups: OptionGroupDTO[];
   renders: RenderDTO[];
+  /** Appended to the image prompt only when this scheme is selected. */
+  generationConstraints: string[];
 };
 
 export type DecorChoice = { key: string; label: string; color: string };
@@ -191,6 +193,17 @@ export type GenerationDTO = {
   message: string | null;
   imageSrc: string | null;
   createdAt: string;
+  stage?: string | null;
+  schemeKey?: string | null;
+  presetKey?: string | null;
+  attempt?: number | null;
+  accepted?: boolean | null;
+};
+
+/** Generated Seedream files found on disk. Keys are scheme keys; finish values are preset keys. */
+export type SeedreamCatalog = {
+  structure: string[];
+  finish: Record<string, string[]>;
 };
 
 export type ProjectDTO = {
@@ -210,6 +223,7 @@ export type ProjectDTO = {
   schemes: SchemeDTO[];
   decor: DecorDTO;
   generations: GenerationDTO[];
+  seedream?: SeedreamCatalog | null;
 };
 
 export type DimensionValue = {

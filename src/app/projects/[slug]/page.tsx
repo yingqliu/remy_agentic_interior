@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { ProjectWorkspace } from "@/components/workspace/project-workspace";
 import { getProjectBySlug } from "@/server/projects";
+import { readSeedreamCatalog } from "@/server/seedream-catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -9,5 +10,6 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
   const project = await getProjectBySlug(slug);
   if (!project) notFound();
   const { selection, ...rest } = project;
-  return <ProjectWorkspace project={rest} mode="designer" initialSelection={selection} />;
+  const seedream = readSeedreamCatalog(rest.schemes.map((scheme) => scheme.key));
+  return <ProjectWorkspace project={{ ...rest, seedream }} mode="designer" initialSelection={selection} />;
 }

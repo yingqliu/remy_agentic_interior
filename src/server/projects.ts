@@ -102,6 +102,7 @@ function toProject(record: ProjectRecord): ProjectDTO | null {
     plan: (scheme.plan as PlanDTO | null) ?? null,
     hotspots: (scheme.hotspots as HotspotDTO[]) ?? [],
     compareRows: (scheme.compareRows as CompareRow[]) ?? [],
+    generationConstraints: asArray(scheme.generationConstraints, asString),
     optionGroups: scheme.optionGroups.map((group) => ({
       key: group.key,
       label: group.label,
@@ -130,18 +131,7 @@ function toProject(record: ProjectRecord): ProjectDTO | null {
       note: render.note,
     })),
   }));
-  const generations: GenerationDTO[] = record.generations.map((row) => {
-    const result = (row.result ?? {}) as { message?: string; imageSrc?: string | null };
-    return {
-      id: row.id,
-      provider: row.provider,
-      status: row.status,
-      prompt: row.prompt,
-      message: result.message ?? null,
-      imageSrc: result.imageSrc ?? null,
-      createdAt: row.createdAt.toISOString(),
-    };
-  });
+  const generations: GenerationDTO[] = record.generations.map((row) => generationFromRow(row));
   const base: ProjectDTO = {
     id: record.id,
     slug: record.slug,
@@ -321,7 +311,21 @@ function uniqueSlug(title: string): string {
   return `${stem}-${randomBytes(3).toString("hex")}`;
 }
 
-export async function recordGeneration(slug: string, result: { provider: string; status: string; prompt: string; message: string; imageSrc: string | null }) {
+export async function recordGeneration(
+  slug: string,
+  result: {
+    provider: string;
+    status: string;
+    prompt: string;
+    message: string;
+    imageSrc: string | null;
+    stage?: string;
+    schemeKey?: string;
+    presetKey?: string;
+    attempt?: number;
+    accepted?: boolean;
+  },
+) {
   const project = await prisma.project.findUnique({ where: { slug }, select: { id: true } });
   if (!project) return null;
   return prisma.generation.create({
@@ -330,9 +334,43 @@ export async function recordGeneration(slug: string, result: { provider: string;
       provider: result.provider,
       status: result.status,
       prompt: result.prompt,
-      result: { message: result.message, imageSrc: result.imageSrc },
+      result: {
+        message: result.message,
+        imageSrc: result.imageSrc,
+        stage: result.stage ?? null,
+        schemeKey: result.schemeKey ?? null,
+        presetKey: result.presetKey ?? null,
+        attempt: result.attempt ?? null,
+        accepted: result.accepted ?? null,
+      },
     },
   });
+}
+
+export function generationFromRow(row: { id: string; provider: string; status: string; prompt: string; result: Prisma.JsonValue | null; createdAt: Date }): GenerationDTO {
+  const result = (row.result ?? {}) as {
+    message?: string;
+    imageSrc?: string | null;
+    stage?: string | null;
+    schemeKey?: string | null;
+    presetKey?: string | null;
+    attempt?: number | null;
+    accepted?: boolean | null;
+  };
+  return {
+    id: row.id,
+    provider: row.provider,
+    status: row.status,
+    prompt: row.prompt,
+    message: result.message ?? null,
+    imageSrc: result.imageSrc ?? null,
+    createdAt: row.createdAt.toISOString(),
+    stage: result.stage ?? null,
+    schemeKey: result.schemeKey ?? null,
+    presetKey: result.presetKey ?? null,
+    attempt: result.attempt ?? null,
+    accepted: result.accepted ?? null,
+  };
 }
 
 export function isDatabaseError(error: unknown): boolean {

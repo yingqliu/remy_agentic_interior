@@ -4,6 +4,7 @@ import {
   chosenScheme,
   colorGridStill,
   colorsEqual,
+  overlaySeedream,
   optionLabel,
   presetByColors,
   presetStill,
@@ -154,7 +155,9 @@ export function buildSummary(project: ProjectDTO, selection: SelectionState): Su
         category: spot.category,
         x: spot.x,
         y: spot.y,
-        still: schemeForThumbs ? presetStill(schemeForThumbs, preset, {}, splash) : null,
+        still: schemeForThumbs
+          ? overlaySeedream(presetStill(schemeForThumbs, preset, {}, splash), schemeForThumbs.key, { kind: "finish", presetKey: preset.key }, project.seedream)
+          : null,
       });
     }
   }
@@ -188,10 +191,20 @@ export function buildSummary(project: ProjectDTO, selection: SelectionState): Su
     const colors =
       selection.committedColors ??
       (committed ? committed.colors : selection.colors);
-    still = colorGridStill(imageScheme, colors, schemeOptions(imageScheme, selection).splash);
+    still = overlaySeedream(
+      colorGridStill(imageScheme, colors, schemeOptions(imageScheme, selection).splash),
+      imageScheme.key,
+      { kind: "finish", presetKey: presetByColors(project.decor.presets, colors)?.key ?? null },
+      project.seedream,
+    );
     exact = true;
   } else if (committed && imageScheme) {
-    still = presetStill(imageScheme, committed, {}, schemeOptions(imageScheme, selection).splash);
+    still = overlaySeedream(
+      presetStill(imageScheme, committed, {}, schemeOptions(imageScheme, selection).splash),
+      imageScheme.key,
+      { kind: "finish", presetKey: committed.key },
+      project.seedream,
+    );
     const colorsMatch =
       selection.committedColors == null || colorsEqual(selection.committedColors, committed.colors);
     exact = colorsMatch && chosen != null;

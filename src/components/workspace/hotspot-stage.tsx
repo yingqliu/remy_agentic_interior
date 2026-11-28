@@ -9,6 +9,7 @@ import type { Still } from "@/lib/visuals";
 
 export function HotspotStage({
   still,
+  badge,
   spots,
   preset,
   presets,
@@ -25,6 +26,7 @@ export function HotspotStage({
   onOpen,
 }: {
   still: Still;
+  badge?: string;
   spots: HotspotDTO[];
   preset: DecorPreset;
   presets: DecorPreset[];
@@ -101,7 +103,7 @@ export function HotspotStage({
         onOpen();
       }}
     >
-      <FrameImage src={still.src} alt={still.alt} frames={still.frames} frame={still.frame} />
+      <FrameImage src={still.src} alt={still.alt} frames={still.frames} frame={still.frame} badge={badge} />
       {still.note ? (
         <div className="pointer-events-none absolute inset-x-2 bottom-2 z-[3] rounded bg-paper/90 px-2 py-1 text-xs text-ink">
           {still.note}
